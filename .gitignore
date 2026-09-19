@@ -11,3 +11,7 @@ wheels/
 
 # Data files
 data/*
+
+# Notebooks
+.ipynb_checkpoints
+notebooks/*.ipynb
