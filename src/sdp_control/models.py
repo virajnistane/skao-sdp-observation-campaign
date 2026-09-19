@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # Author: Viraj Nistane
-# Description: This file contains the task to receive visibilities from the SDP pipeline 
+# Description: This file contains the task to receive visibilities from the SDP pipeline
 # and store them in a specified directory.
 
-from enum import StrEnum
 from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
 
 
@@ -25,9 +25,10 @@ class Observation:
 
     def __str__(self):
         return f"Observation(id={self.id}, state={self.state}, ms_path={self.ms_path})"
+
     def __repr__(self):
         return f"Observation(id={self.id}, state={self.state}, ms_path={self.ms_path})"
-    
+
     # def __post_init__(self):
     #     # Validate that the state is a valid ObservationState
     #     if not isinstance(self.state, ObservationState):
@@ -41,5 +42,7 @@ class Observation:
 
     def update_state(self, new_state: ObservationState):
         if not isinstance(new_state, ObservationState):
-            raise ValueError(f"Invalid new_state: {new_state}. Must be an instance of ObservationState.")
+            raise ValueError(
+                f"Invalid new_state: {new_state}. Must be an instance of ObservationState."
+            )
         self.state = new_state
