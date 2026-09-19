@@ -21,20 +21,23 @@ class ObservationState(StrEnum):
 class Observation:
     id: str
     state: ObservationState
-    data_dir: str
+    ms_path: Path
 
-    def __post_init__(self):
-        # Validate that the state is a valid ObservationState
-        if not isinstance(self.state, ObservationState):
-            raise ValueError(f"Invalid state: {self.state}. Must be an instance of ObservationState.")
-
-        # Validate that the data_dir is a valid path
-        if not Path(self.data_dir).exists():
-            raise ValueError(f"Invalid data_dir: {self.data_dir}. Must be a valid path.")
-
-        # Validate that the data_dir is a directory
-        if not Path(self.data_dir).is_dir():
-            raise ValueError(f"Invalid data_dir: {self.data_dir}. Must be a directory.")
+    def __str__(self):
+        return f"Observation(id={self.id}, state={self.state}, ms_path={self.ms_path})"
+    def __repr__(self):
+        return f"Observation(id={self.id}, state={self.state}, ms_path={self.ms_path})"
+    
+    # def __post_init__(self):
+    #     # Validate that the state is a valid ObservationState
+    #     if not isinstance(self.state, ObservationState):
+    #         raise ValueError(f"Invalid state: {self.state}. Must be an instance of ObservationState.")
+    #     # Validate that the ms_path is a valid path
+    #     if not self.ms_path.exists():
+    #         raise ValueError(f"Invalid ms_path: {self.ms_path}. Must be a valid path.")
+    #     # Validate that the ms_path is a directory
+    #     if not self.ms_path.is_dir():
+    #         raise ValueError(f"Invalid ms_path: {self.ms_path}. Must be a directory.")
 
     def update_state(self, new_state: ObservationState):
         if not isinstance(new_state, ObservationState):

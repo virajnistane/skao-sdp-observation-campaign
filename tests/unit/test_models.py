@@ -2,8 +2,11 @@
 # Author: Viraj Nistane
 # Description: This file contains unit tests for the models defined in src/sdp_control/models.py.
 
+from pathlib import Path
+
 from sdp_control.models import ObservationState, Observation # type: ignore
 
+ROOT_DIR = Path(__file__).parent.parent.parent
 
 def test_observation_state_enum():
     # Test the ObservationState enum
@@ -25,7 +28,7 @@ def test_observation_state_enum():
 
 def test_observation_model():
     # Test the Observation model
-    obs = Observation(id="obs_test", state=ObservationState.RECEIVING, data_dir="/data/obs_test")
+    obs = Observation(id="obs_test", state=ObservationState.RECEIVING, ms_path=Path(f"{ROOT_DIR}/data/obs_test/obs_test.ms"))
     assert obs.id == "obs_test"
     assert obs.state == ObservationState.RECEIVING
-    assert obs.data_dir == "/data/obs_test"
+    assert obs.ms_path == Path(f"{ROOT_DIR}/data/obs_test/obs_test.ms")
