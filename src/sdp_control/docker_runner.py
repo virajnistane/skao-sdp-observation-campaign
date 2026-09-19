@@ -4,6 +4,7 @@
 # and store them in a specified directory.
 
 import logging
+import shlex
 import subprocess
 
 logger = logging.getLogger(__name__)
@@ -22,12 +23,12 @@ def run_container(image: str, command: str, volumes: dict) -> None:
         RuntimeError: If the Docker command fails.
     """
     # Construct the volume arguments for the Docker command
-    volume_args = []
+    volume_args: list[str] = []
     for host_path, container_path in volumes.items():
         volume_args.extend(["-v", f"{host_path}:{container_path}"])
 
     # Construct the full Docker command
-    docker_command = ["docker", "run", "--rm"] + volume_args + [image] + command.split()
+    docker_command = ["docker", "run", "--rm"] + volume_args + [image] + shlex.split(command)
 
     logger.info(f"Running Docker container: {' '.join(docker_command)}")
 
