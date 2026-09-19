@@ -19,6 +19,9 @@ def run_container(image: str, command: str, volumes: dict) -> None:
         command (str): The command to run inside the container.
         volumes (dict): A dictionary mapping host paths to container paths for volume mounting.
 
+    Returns:
+        None
+
     Raises:
         RuntimeError: If the Docker command fails.
     """

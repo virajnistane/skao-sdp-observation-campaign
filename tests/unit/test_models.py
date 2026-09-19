@@ -28,7 +28,7 @@ def test_observation_state_enum():
 
 def test_observation_model():
     # Test the Observation model
-    obs = Observation(id="obs_test", state=ObservationState.RECEIVING, ms_path=Path(f"{ROOT_DIR}/data/obs_test/obs_test.ms"))
+    obs = Observation(id="obs_test", state=ObservationState.RECEIVING, ms_dir=str(ROOT_DIR / "data"))
     assert obs.id == "obs_test"
     assert obs.state == ObservationState.RECEIVING
-    assert obs.ms_path == Path(f"{ROOT_DIR}/data/obs_test/obs_test.ms")
+    assert obs.ms_dir == f"{ROOT_DIR}/data"

@@ -21,13 +21,13 @@ class ObservationState(StrEnum):
 class Observation:
     id: str
     state: ObservationState
-    ms_path: Path
+    ms_dir: str
 
     def __str__(self):
-        return f"Observation(id={self.id}, state={self.state}, ms_path={self.ms_path})"
+        return f"Observation(id={self.id}, state={self.state}, ms_path={self.ms_dir})"
 
     def __repr__(self):
-        return f"Observation(id={self.id}, state={self.state}, ms_path={self.ms_path})"
+        return f"Observation(id={self.id}, state={self.state}, ms_path={self.ms_dir})"
 
     # def __post_init__(self):
     #     # Validate that the state is a valid ObservationState
