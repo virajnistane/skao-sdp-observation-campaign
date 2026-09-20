@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 import yaml
 
-ROOT_DIR = Path(__file__).parent.parent
+ROOT_DIR = Path(__file__).parent.parent.parent
 
 @dataclass
 class AppConfig:

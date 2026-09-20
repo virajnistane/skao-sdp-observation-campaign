@@ -11,9 +11,16 @@ from sdp_control.utils.docker_runner import run_container # type: ignore
 from sdp_control.models import Observation, ObservationState # type: ignore
 from sdp_control.config import config
 
+@task(
+    name="process_visibilities", 
+    retries=3, 
+    retry_delay_seconds=10, 
+    log_prints=True
+)
 def process_visibilities(observation: Observation) -> Observation:
 
-    logger = logging.getLogger(__name__)
+    logger = get_run_logger()
+    # logger = logging.getLogger(__name__)
 
     process_cfg = config.containers.process
     mount_path = config.containers.mount_path
