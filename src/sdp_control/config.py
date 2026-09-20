@@ -97,10 +97,16 @@ def load_config(path: str | Path | None = None) -> Config:
 		values = yaml.safe_load(stream) or {}
 
 	containers = values.get("containers", {})
+	storage = values.get("storage", {})
+	for path_key in ("data_dir", "observations_dir"):
+		path_value = storage.get(path_key)
+		if path_value and not Path(path_value).is_absolute():
+			storage[path_key] = str(ROOT_DIR / path_value)
+
 	return Config(
 		ROOT_DIR=ROOT_DIR,
 		app=_section(AppConfig, values.get("app")),
-		storage=_section(StorageConfig, values.get("storage")),
+		storage=_section(StorageConfig, storage),
 		observation=_section(ObservationConfig, values.get("observation")),
 		processing=_section(ProcessingConfig, values.get("processing")),
 		containers=ContainersConfig(

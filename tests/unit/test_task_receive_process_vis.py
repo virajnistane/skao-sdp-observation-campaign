@@ -31,14 +31,15 @@ def test_process_visibilities(received_observation):
     assert ms_dir_path.exists()
     assert ms_dir_path.is_dir()
 
-    # Check that the expected files are present in the ms_dir
+    # Check that the expected files are present in the processed output
+    output_dir = ms_dir_path / "obs_test_processed"
     expected = [
-        "obs_test-dirty.fits", 
-        "obs_test-image.fits", 
-        "obs_test-psf.fits", 
-        "obs_test-residual.fits", 
-        "obs_test-model.fits"
+        "out-dirty.fits",
+        "out-image.fits",
+        "out-psf.fits",
+        "out-residual.fits",
+        "out-model.fits",
     ]
     for file_name in expected:
-        file_path = ms_dir_path / file_name
-        assert file_path.exists(), f"Expected file {file_name} not found in {ms_dir_path}"
+        file_path = output_dir / file_name
+        assert file_path.exists(), f"Expected file {file_name} not found in {output_dir}"
