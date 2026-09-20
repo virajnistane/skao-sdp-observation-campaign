@@ -1,0 +1,48 @@
+# Local defaults for the SDP observation control system.
+# Values can be overridden for a Kubernetes deployment or in tests.
+
+app:
+  name: ska-sdp-long-observation
+  environment: local
+
+storage:
+  data_dir: /data
+  observations_dir: /data/observations
+  storage_threshold_mb: 10240  # 10 GiB
+  measurement_suffix: .ms
+
+observation:
+  receive_interval_seconds: 60
+  max_observations: null
+  retry_attempts: 2
+  retry_delay_seconds: 10
+
+processing:
+  max_concurrency: 2
+  command_timeout_seconds: 3600
+
+containers:
+  runner: docker
+  receive:
+    image: docker.io/pw410/ska-sdp-mock:0.1
+    command: ["/scripts/generate_visibilities.sh"]
+  process:
+    image: docker.io/pw410/ska-sdp-mock:0.1
+    command: ["/scripts/process_visibilities.sh"]
+  volume_name: ska-sdp-data
+  mount_path: /data
+
+quality_gate:
+  enabled: true
+  outcomes:
+    - Continue
+    - Reprocess
+
+kubernetes:
+  namespace: default
+  pvc_name: ska-sdp-data
+  image_pull_policy: IfNotPresent
+  active_deadline_seconds: 3600
+
+logging:
+  level: INFO

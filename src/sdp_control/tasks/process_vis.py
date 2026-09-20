@@ -9,13 +9,14 @@ from prefect import task, get_run_logger
 
 from sdp_control.utils.docker_runner import run_container # type: ignore
 from sdp_control.models import Observation, ObservationState # type: ignore
-
-MOCK_IMAGE = "docker.io/pw410/ska-sdp-mock:0.1"
-PROCESS_SCRIPT = "/scripts/process_visibilities.sh"
+from config import config
 
 def process_visibilities(observation: Observation) -> Observation:
 
     logger = logging.getLogger(__name__)
+
+    process_cfg = config.containers.process
+    mount_path = config.containers.mount_path
 
     ms_dir_host = Path(observation.ms_dir)
     ms_dir_host.mkdir(parents=True, exist_ok=True)
@@ -27,10 +28,11 @@ def process_visibilities(observation: Observation) -> Observation:
 
     try:
         # Run the Docker container to process visibilities
+        command_parts = [*process_cfg.command, str(ms_path_container), str(out_path_container_prefix)]
         run_container(
-            image=MOCK_IMAGE,
-            command=f"{PROCESS_SCRIPT} {str(ms_path_container)} {str(out_path_container_prefix)}",
-            volumes={str(ms_dir_host): "/data"},
+            image=process_cfg.image,
+            command=" ".join(command_parts),
+            volumes={str(ms_dir_host): mount_path},
         )
 
 
