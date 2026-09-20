@@ -1,19 +1,27 @@
 
 from pathlib import Path
 from sdp_control.models import ObservationState, Observation # type: ignore
+from sdp_control.tasks.receive_vis import receive_visibilities # type: ignore
 from sdp_control.tasks.process_vis import process_visibilities # type: ignore
 import pytest
 
-ROOT_DIR = Path(__file__).parent.parent
+
+@pytest.fixture
+def received_observation(tmp_path):
+    # process_visibilities operates on an existing .ms, so receive it first
+    obs = Observation(id="obs_test", ms_dir=str(tmp_path), state=ObservationState.RECEIVING)
+    return receive_visibilities(obs)
 
 
-def test_receive_visibilities():
-    # Create an observation in the RECEIVING state
-    obs = Observation(id="obs_test", ms_dir=str(ROOT_DIR / "data"), state=ObservationState.RECEIVING)
+def test_receive_visibilities(received_observation):
+    assert received_observation.state == ObservationState.STORED
+
+    ms_path = Path(received_observation.ms_dir) / "obs_test.ms"
+    assert ms_path.exists(), f"Expected {ms_path} to be created by receive_visibilities"
 
 
-    # Call the process_visibilities function
-    updated_obs = process_visibilities(obs)
+def test_process_visibilities(received_observation):
+    updated_obs = process_visibilities(received_observation)
 
     # Check that the state has been updated to AWAITING_REVIEW
     assert updated_obs.state == ObservationState.AWAITING_REVIEW

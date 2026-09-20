@@ -4,6 +4,7 @@
 # and store them in a specified directory.
 
 import logging
+import os
 import shlex
 import subprocess
 
@@ -30,8 +31,13 @@ def run_container(image: str, command: str, volumes: dict) -> None:
     for host_path, container_path in volumes.items():
         volume_args.extend(["-v", f"{host_path}:{container_path}"])
 
+    # Run as the host user so mounted volume output isn't root-owned and can be cleaned up
+    user_args: list[str] = []
+    if hasattr(os, "getuid"):
+        user_args = ["-u", f"{os.getuid()}:{os.getgid()}"]
+
     # Construct the full Docker command
-    docker_command = ["docker", "run", "--rm"] + volume_args + [image] + shlex.split(command)
+    docker_command = ["docker", "run", "--rm"] + user_args + volume_args + [image] + shlex.split(command)
 
     logger.info(f"Running Docker container: {' '.join(docker_command)}")
 
