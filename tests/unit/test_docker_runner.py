@@ -1,7 +1,7 @@
 
 import pytest
 
-from sdp_control.docker_runner import run_container # type: ignore
+from sdp_control.utils.docker_runner import run_container # type: ignore
 
 
 def test_run_container(tmp_path):

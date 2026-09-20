@@ -7,7 +7,7 @@ from pathlib import Path
 
 from prefect import task, get_run_logger
 
-from sdp_control.docker_runner import run_container # type: ignore
+from sdp_control.utils.docker_runner import run_container # type: ignore
 from sdp_control.models import Observation, ObservationState # type: ignore
 
 MOCK_IMAGE = "docker.io/pw410/ska-sdp-mock:0.1"
