@@ -9,8 +9,7 @@ from prefect import task, get_run_logger
 
 from sdp_control.utils.docker_runner import run_container # type: ignore
 from sdp_control.models import Observation, ObservationState # type: ignore
-
-from config import config
+from sdp_control.config import config
 
 def receive_visibilities(observation: Observation) -> Observation:
 

@@ -7,7 +7,7 @@
 import os
 from pathlib import Path
 import logging
-from config import config
+from sdp_control.config import config
 
 logging.basicConfig(level=config.logging.level, format="%(asctime)s - %(levelname)s - %(message)s")
 logging.info("Starting storage tasks...")

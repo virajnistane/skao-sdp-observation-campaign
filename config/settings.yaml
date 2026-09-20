@@ -8,7 +8,7 @@ app:
 storage:
   data_dir: /data
   observations_dir: /data/observations
-  storage_threshold_mb: 10240  # 10 GiB
+  storage_threshold_mb: 5120  # 5 GiB
   measurement_suffix: .ms
 
 observation:
