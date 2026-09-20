@@ -6,10 +6,30 @@ import logging
 from pathlib import Path
 
 from prefect import task, get_run_logger
+from prefect.client.orchestration import get_client
+from prefect.client.schemas.actions import GlobalConcurrencyLimitCreate
+from prefect.concurrency.sync import concurrency
 
 from sdp_control.utils.docker_runner import run_container # type: ignore
 from sdp_control.models import Observation, ObservationState # type: ignore
 from sdp_control.config import config
+
+PROCESS_CONCURRENCY_LIMIT_NAME = "process-visibilities"
+
+
+def _ensure_process_concurrency_limit() -> None:
+    """Create the global concurrency limit backing max_concurrency, if it doesn't exist yet."""
+    client = get_client(sync_client=True)
+    try:
+        client.read_global_concurrency_limit_by_name(PROCESS_CONCURRENCY_LIMIT_NAME)
+    except Exception:
+        client.create_global_concurrency_limit(
+            GlobalConcurrencyLimitCreate(
+                name=PROCESS_CONCURRENCY_LIMIT_NAME,
+                limit=config.processing.max_concurrency,
+            )
+        )
+
 
 @task(
     name="process_visibilities", 
@@ -34,13 +54,15 @@ def process_visibilities(observation: Observation) -> Observation:
     logger.info(f"{observation.state.name}: {observation.id} -> {ms_dir_host}")
 
     try:
-        # Run the Docker container to process visibilities
+        # Cap concurrent Docker runs at config.processing.max_concurrency
+        _ensure_process_concurrency_limit()
         command_parts = [*process_cfg.command, str(ms_path_container), str(out_path_container_prefix)]
-        run_container(
-            image=process_cfg.image,
-            command=" ".join(command_parts),
-            volumes={str(ms_dir_host): mount_path},
-        )
+        with concurrency(PROCESS_CONCURRENCY_LIMIT_NAME, occupy=1):
+            run_container(
+                image=process_cfg.image,
+                command=" ".join(command_parts),
+                volumes={str(ms_dir_host): mount_path},
+            )
 
 
         # Update the observation state to AWAITING_REVIEW after successful processing
