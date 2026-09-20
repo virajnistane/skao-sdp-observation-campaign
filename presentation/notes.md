@@ -16,4 +16,6 @@
 2. Modules, `receive.py` and `process.py`, as **plain functions** calling `docker_runner`.
 3. Unit test: `test_task_receive_process_vis.py` covering both, `receive` and `process`, steps.
 
-### Step 4: 
+### Step 4: Storage module
+
+1. Module, `storage.py`: sum .ms directory sizes under /data, compare to a configured threshold

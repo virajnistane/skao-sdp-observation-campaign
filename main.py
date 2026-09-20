@@ -8,7 +8,9 @@ import os
 import numpy as np
 from pathlib import Path
 from sdp_control.config import config # type: ignore
-from sdp_control.tasks.storage import get_ms_size_mb # type: ignore
+from sdp_control.tasks.storage import ( # type: ignore
+    get_ms_size_mb, get_total_ms_size_mb, storage_full
+ ) 
 from sdp_control.models import Observation, ObservationState # type: ignore
 from sdp_control.tasks.receive_vis import receive_visibilities # type: ignore
 from sdp_control.tasks.process_vis import process_visibilities # type: ignore
@@ -23,25 +25,25 @@ def main():
     # This is a simple example of how to use the SDP pipeline tasks
 
     # Measure size of all the Measurement Sets before processing
-    ms_dir = str(config.ROOT_DIR / "data")
-    ms_size_total_mb = np.sum([
-        get_ms_size_mb(str(Path(ms_dir) / ms_dir_name))
-        for ms_dir_name in os.listdir(ms_dir)
-        if (Path(ms_dir) / ms_dir_name).is_dir()
-    ])
-    logger.info(f"Total size of all Measurement Sets before processing: {ms_size_total_mb:.2f} MB")
+    ms_size_total_mb = get_total_ms_size_mb(config.storage.data_dir, 0.0)
+    logger.info(f"Total size of all Measurement Sets before starting campaign: {ms_size_total_mb:.2f} MB")
 
     iter = 0
     process_futures = []
 
     while True:
-        
-        if ms_size_total_mb > config.storage.storage_threshold_mb:
-            logger.info(f"Storage limit exceeded: {ms_size_total_mb:.2f} MB > {config.storage.storage_threshold_mb:.2f} MB")
+        if storage_full(ms_size_total_mb):
+            logger.info(
+                f"Storage limit exceeded: {ms_size_total_mb:.2f} MB > {config.storage.storage_threshold_mb:.2f} MB"
+            )
             break
 
         # Create an observation in the RECEIVING state
-        obs = Observation(id=f"obs_{iter:03d}", ms_dir=ms_dir, state=ObservationState.RECEIVING)
+        obs = Observation(
+            id=f"obs_{iter:03d}", 
+            ms_dir=config.storage.data_dir, 
+            state=ObservationState.RECEIVING
+        )
 
         # Call the receive_visibilities function
         updated_obs = receive_visibilities(obs)
@@ -55,11 +57,7 @@ def main():
         process_futures.append(process_visibilities.submit(updated_obs))
 
         # Update the total size of all the Measurement Sets
-        ms_size_total_mb = np.sum([
-            get_ms_size_mb(str(Path(ms_dir) / ms_dir_name))
-            for ms_dir_name in os.listdir(ms_dir)
-            if (Path(ms_dir) / ms_dir_name).is_dir()
-        ])
+        ms_size_total_mb = get_total_ms_size_mb(config.storage.data_dir, ms_size_total_mb)
         logger.info(f"Total size of all Measurement Sets after processing: {ms_size_total_mb:.2f} MB")
 
         iter += 1
