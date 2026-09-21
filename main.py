@@ -8,6 +8,8 @@ import os
 import numpy as np
 from pathlib import Path
 from typing import Any, cast
+from datetime import datetime
+import logging
 
 from sdp_control.config import config
 from sdp_control.tasks.storage import (
@@ -20,8 +22,14 @@ from sdp_control.tasks.review import ReviewDecision, review_processed_visibiliti
 from prefect import flow, task, get_run_logger
 from prefect.futures import PrefectFuture
 
+
+
 @flow(name="long_term_observation_campaign", log_prints=True)
 def main():
+    logger = get_run_logger()
+    logger.info("Starting long-term observation campaign")
+
+    datetime_stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
     logger = get_run_logger()
 
@@ -38,7 +46,7 @@ def main():
     prior_review_future: PrefectFuture[ReviewDecision | None] | None = None
 
     while True:
-        if storage_full(ms_size_total_mb):
+        if storage_full(current_total_size_mb=ms_size_total_mb):
             logger.info(
                 f"Storage limit exceeded: {ms_size_total_mb:.2f} MB > {config.storage.storage_threshold_mb:.2f} MB"
             )
@@ -48,7 +56,8 @@ def main():
         obs = Observation(
             id=f"obs_{iter:03d}", 
             ms_dir=config.storage.data_dir, 
-            state=ObservationState.RECEIVING
+            state=ObservationState.RECEIVING,
+            datetime_stamp=datetime_stamp
         )
 
         # Call the receive_visibilities function

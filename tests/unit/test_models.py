@@ -28,7 +28,8 @@ def test_observation_state_enum():
 
 def test_observation_model():
     # Test the Observation model
-    obs = Observation(id="obs_test", state=ObservationState.RECEIVING, ms_dir=str(ROOT_DIR / "data"))
+    obs = Observation(id="obs_test", state=ObservationState.RECEIVING, ms_dir=str(ROOT_DIR / "data"), datetime_stamp="2024-01-01_00-00-00")
     assert obs.id == "obs_test"
     assert obs.state == ObservationState.RECEIVING
     assert obs.ms_dir == f"{ROOT_DIR}/data"
+    assert obs.datetime_stamp == "2024-01-01_00-00-00"

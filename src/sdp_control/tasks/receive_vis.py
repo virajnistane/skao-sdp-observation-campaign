@@ -13,7 +13,8 @@ from sdp_control.config import config
 
 
 @task(
-    name="receive_visibilities", 
+    name="receive_visibilities",
+    task_run_name="receive-{(observation.id).replace('_', '-')}",
     retries=3, 
     retry_delay_seconds=10, 
     log_prints=True
@@ -28,7 +29,7 @@ def receive_visibilities(observation: Observation) -> Observation:
 
     ms_dir_host = Path(observation.ms_dir)
     ms_dir_host.mkdir(parents=True, exist_ok=True)
-    ms_path_container = Path(mount_path) / f"{observation.id}.ms"
+    ms_path_container = Path(mount_path) / f"{observation.id}_raw_{observation.datetime_stamp}.ms"
 
     observation.update_state(ObservationState.RECEIVING)
     logger.info(f"{observation.state.name}: {observation.id} -> {ms_dir_host}")

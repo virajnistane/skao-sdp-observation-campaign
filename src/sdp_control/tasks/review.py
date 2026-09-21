@@ -18,6 +18,7 @@ class ReviewDecision(StrEnum):
 
 @task(
     name="review_processed_visibilities",
+    task_run_name="review-{(observation.id).replace('_', '-')}",
     retries=3,
     retry_delay_seconds=10,
     log_prints=True
@@ -37,7 +38,7 @@ def review_processed_visibilities(observation: Observation) -> ReviewDecision | 
         return None
 
     # Construct the path to the processed data directory
-    processed_data_dir = Path(config.storage.data_dir) / f"{observation.id}_processed"
+    processed_data_dir = Path(config.storage.data_dir) / f"{observation.id}_processed_{observation.datetime_stamp}"
 
     # Check if the processed data directory exists
     if not processed_data_dir.exists():
@@ -52,19 +53,13 @@ def review_processed_visibilities(observation: Observation) -> ReviewDecision | 
     return decision  # Return the decision made by the reviewer
 
 
-def remove_ms(observation_id: str | Path) -> None:
+def remove_ms(observation: Observation) -> None:
     """
     Remove the Measurement Set (MS) directory for a given observation ID.
 
     Args:
-        observation_id (str): The ID of the observation whose MS directory is to be removed.
+        observation (Observation): The observation whose MS directory is to be removed.
     """
-    ms_dir = Path(config.storage.data_dir) / f"{observation_id}.ms"
+    ms_dir = Path(config.storage.data_dir) / f"{observation.id}_raw_{observation.datetime_stamp}.ms"
     
-    if ms_dir.exists():
-        for item in ms_dir.iterdir():
-            if item.is_file():
-                item.unlink()  # Remove file
-            elif item.is_dir():
-                remove_ms(item)  # Recursively remove subdirectory
-        ms_dir.rmdir()  # Remove the now-empty directory
+    pass

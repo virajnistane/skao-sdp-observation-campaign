@@ -3,6 +3,7 @@
 # Description: This file contains the task to receive visibilities from the SDP pipeline
 # and store them in a specified directory.
 
+import datetime
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
@@ -22,12 +23,13 @@ class Observation:
     id: str
     state: ObservationState
     ms_dir: str
+    datetime_stamp: datetime.datetime | str
 
     def __str__(self):
-        return f"Observation(id={self.id}, state={self.state}, ms_path={self.ms_dir})"
+        return f"Observation(id={self.id}, state={self.state}, ms_path={self.ms_dir}, datetime_stamp={self.datetime_stamp})"
 
     def __repr__(self):
-        return f"Observation(id={self.id}, state={self.state}, ms_path={self.ms_dir})"
+        return f"Observation(id={self.id}, state={self.state}, ms_path={self.ms_dir}, datetime_stamp={self.datetime_stamp})"
 
     # def __post_init__(self):
     #     # Validate that the state is a valid ObservationState

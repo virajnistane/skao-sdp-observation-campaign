@@ -10,7 +10,7 @@ import pytest
 @pytest.fixture
 def received_observation(tmp_path):
     # process_visibilities operates on an existing .ms, so receive it first
-    obs = Observation(id="obs_test", ms_dir=str(tmp_path), state=ObservationState.RECEIVING)
+    obs = Observation(id="obs_test", ms_dir=str(tmp_path), state=ObservationState.RECEIVING, datetime_stamp="2024-01-01_00-00-00")
     return receive_visibilities(obs)
 
 
@@ -22,7 +22,7 @@ def test_review_processed_visibilities():
 def test_receive_visibilities(received_observation):
     assert received_observation.state == ObservationState.STORED
 
-    ms_path = Path(received_observation.ms_dir) / "obs_test.ms"
+    ms_path = Path(received_observation.ms_dir) / "obs_test_raw_2024-01-01_00-00-00.ms"
     assert ms_path.exists(), f"Expected {ms_path} to be created by receive_visibilities"
 
 
@@ -38,7 +38,7 @@ def test_process_visibilities(received_observation):
     assert ms_dir_path.is_dir()
 
     # Check that the expected files are present in the processed output
-    output_dir = ms_dir_path / "obs_test_processed"
+    output_dir = ms_dir_path / "obs_test_processed_2024-01-01_00-00-00"
     expected = [
         "out-dirty.fits",
         "out-image.fits",
