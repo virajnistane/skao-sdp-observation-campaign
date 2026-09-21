@@ -37,6 +37,7 @@ quality_gate:
   outcomes:
     - Continue
     - Reprocess
+  max_attempts: 2
 
 kubernetes:
   namespace: default

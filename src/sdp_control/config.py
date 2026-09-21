@@ -58,6 +58,7 @@ class ContainersConfig:
 class QualityGateConfig:
 	enabled: bool = True
 	outcomes: list[str] = field(default_factory=lambda: ["Continue", "Reprocess"])
+	max_attempts: int = 2
 
 
 @dataclass
