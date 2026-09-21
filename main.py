@@ -18,7 +18,7 @@ from sdp_control.tasks.storage import (
 from sdp_control.models import Observation, ObservationState
 from sdp_control.tasks.receive_vis import receive_visibilities
 from sdp_control.tasks.process_vis import process_visibilities
-from sdp_control.tasks.review import ReviewDecision, review_processed_visibilities
+from sdp_control.tasks.review import ReviewDecision, review_processed_visibilities, resolve_review_cycle
 from prefect import flow, task, get_run_logger
 from prefect.futures import PrefectFuture
 
@@ -79,7 +79,7 @@ def main():
             cast(Observation, future_process),
             wait_for=prior_review_future,
         )
-        futures_review_list.append(future_review)
+        futures_review_list.append((future_process, future_review))
         prior_review_future = future_review
 
         # Update the total size of all the Measurement Sets
@@ -94,9 +94,10 @@ def main():
         if processed_obs.state != ObservationState.AWAITING_REVIEW:
             logger.info(f"Failed to process visibilities for observation {processed_obs.id}. Current state: {processed_obs.state.name}")
 
-    # Wait for all submitted (chained) review tasks to finish
-    for review_future in futures_review_list:
-        review_future.result()
+    # Wait for all submitted (chained) review tasks to finish and act on their decision,
+    # looping through reprocess cycles until each observation reaches a terminal outcome.
+    for process_future, review_future in futures_review_list:
+        resolve_review_cycle(process_future, review_future, logger)
 
 if __name__ == "__main__":
     main.serve()
