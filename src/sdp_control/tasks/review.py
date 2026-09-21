@@ -11,6 +11,7 @@ from prefect.flow_runs import pause_flow_run
 
 from sdp_control.config import config
 from sdp_control.models import Observation, ObservationState
+from sdp_control.tasks.preview_artifact import create_preview_artifact
 
 class ReviewDecision(StrEnum):
     CONTINUE = "continue"
@@ -18,7 +19,7 @@ class ReviewDecision(StrEnum):
 
 @task(
     name="review_processed_visibilities",
-    task_run_name="review-{(observation.id).replace('_', '-')}",
+    task_run_name="review-{observation.id}",
     retries=3,
     retry_delay_seconds=10,
     log_prints=True
@@ -43,6 +44,9 @@ def review_processed_visibilities(observation: Observation) -> ReviewDecision | 
     # Check if the processed data directory exists
     if not processed_data_dir.exists():
         raise FileNotFoundError(f"Processed data directory does not exist: {processed_data_dir}")
+
+    # Create a preview artifact for the observation
+    create_preview_artifact(observation)
 
     # Pause until the reviewer chooses the next workflow action.
     decision = pause_flow_run(
