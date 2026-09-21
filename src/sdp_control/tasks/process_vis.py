@@ -50,8 +50,8 @@ def process_visibilities(observation: Observation) -> Observation:
 
     ms_path_container = Path(mount_path) / f"{observation.id}.ms"
 
-    out_path_host = ms_dir_host / f"{observation.id}_processed" / "out"
-    out_path_host.mkdir(parents=True, exist_ok=True)
+    out_dir_host = ms_dir_host / f"{observation.id}_processed"
+    out_dir_host.mkdir(parents=True, exist_ok=True)
     out_path_container_prefix = Path(mount_path) / f"{observation.id}_processed" / "out"
 
     observation.update_state(ObservationState.RECEIVING)
