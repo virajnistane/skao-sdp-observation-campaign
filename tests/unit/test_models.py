@@ -4,7 +4,7 @@
 
 from pathlib import Path
 
-from sdp_control.models import ObservationState, Observation # type: ignore
+from sdp_control.models import ObservationState, Observation
 
 ROOT_DIR = Path(__file__).parent.parent.parent
 

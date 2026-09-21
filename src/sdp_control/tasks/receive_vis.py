@@ -7,8 +7,8 @@ from pathlib import Path
 
 from prefect import task, get_run_logger
 
-from sdp_control.utils.docker_runner import run_container # type: ignore
-from sdp_control.models import Observation, ObservationState # type: ignore
+from sdp_control.utils.docker_runner import run_container
+from sdp_control.models import Observation, ObservationState
 from sdp_control.config import config
 
 

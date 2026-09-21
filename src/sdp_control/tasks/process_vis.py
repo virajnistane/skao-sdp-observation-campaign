@@ -10,8 +10,8 @@ from prefect.client.orchestration import get_client
 from prefect.client.schemas.actions import GlobalConcurrencyLimitCreate
 from prefect.concurrency.sync import concurrency
 
-from sdp_control.utils.docker_runner import run_container # type: ignore
-from sdp_control.models import Observation, ObservationState # type: ignore
+from sdp_control.utils.docker_runner import run_container
+from sdp_control.models import Observation, ObservationState
 from sdp_control.config import config
 
 PROCESS_CONCURRENCY_LIMIT_NAME = "process-visibilities"

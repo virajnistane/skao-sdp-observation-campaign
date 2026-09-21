@@ -5,5 +5,5 @@
 
 def test_storage():
     # Placeholder test to ensure the storage module is imported correctly
-    from sdp_control.config import StorageConfig  # type: ignore
+    from sdp_control.config import StorageConfig
     assert StorageConfig is not None
