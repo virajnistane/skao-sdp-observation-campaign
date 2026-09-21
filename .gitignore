@@ -16,3 +16,6 @@ tests/data/*
 # Notebooks
 .ipynb_checkpoints
 notebooks/*.ipynb
+
+# Notes
+presentation/ai_usage.md

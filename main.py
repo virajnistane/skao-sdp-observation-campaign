@@ -7,14 +7,18 @@
 import os
 import numpy as np
 from pathlib import Path
-from sdp_control.config import config # type: ignore
-from sdp_control.tasks.storage import ( # type: ignore
+from typing import Any, cast
+
+from sdp_control.config import config
+from sdp_control.tasks.storage import (
     get_ms_size_mb, get_total_ms_size_mb, storage_full
  ) 
-from sdp_control.models import Observation, ObservationState # type: ignore
-from sdp_control.tasks.receive_vis import receive_visibilities # type: ignore
-from sdp_control.tasks.process_vis import process_visibilities # type: ignore
+from sdp_control.models import Observation, ObservationState
+from sdp_control.tasks.receive_vis import receive_visibilities
+from sdp_control.tasks.process_vis import process_visibilities
+from sdp_control.tasks.review import ReviewDecision, review_processed_visibilities
 from prefect import flow, task, get_run_logger
+from prefect.futures import PrefectFuture
 
 @flow(name="long_term_observation_campaign", log_prints=True)
 def main():
@@ -29,7 +33,9 @@ def main():
     logger.info(f"Total size of all Measurement Sets before starting campaign: {ms_size_total_mb:.2f} MB")
 
     iter = 0
-    process_futures = []
+    futures_process_list = []
+    futures_review_list = []
+    prior_review_future: PrefectFuture[ReviewDecision | None] | None = None
 
     while True:
         if storage_full(ms_size_total_mb):
@@ -54,7 +60,18 @@ def main():
             break
 
         # Submit process_visibilities to run concurrently; the loop doesn't wait on it
-        process_futures.append(process_visibilities.submit(updated_obs))
+        future_process = process_visibilities.submit(updated_obs)
+        futures_process_list.append(future_process)
+
+        # Submit review chained to its own process future and the prior review,
+        # so it starts as soon as both are done rather than waiting on the whole receive loop
+        submit_review = cast(Any, review_processed_visibilities.submit)
+        future_review = submit_review(
+            cast(Observation, future_process),
+            wait_for=prior_review_future,
+        )
+        futures_review_list.append(future_review)
+        prior_review_future = future_review
 
         # Update the total size of all the Measurement Sets
         ms_size_total_mb = get_total_ms_size_mb(config.storage.data_dir, ms_size_total_mb)
@@ -63,10 +80,14 @@ def main():
         iter += 1
 
     # Wait for all submitted processing tasks to finish and check their outcome
-    for future in process_futures:
+    for future in futures_process_list:
         processed_obs = future.result()
         if processed_obs.state != ObservationState.AWAITING_REVIEW:
             logger.info(f"Failed to process visibilities for observation {processed_obs.id}. Current state: {processed_obs.state.name}")
 
+    # Wait for all submitted (chained) review tasks to finish
+    for review_future in futures_review_list:
+        review_future.result()
+
 if __name__ == "__main__":
-    main()
+    main.serve()

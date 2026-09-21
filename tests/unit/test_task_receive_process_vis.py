@@ -1,8 +1,9 @@
 
 from pathlib import Path
-from sdp_control.models import ObservationState, Observation # type: ignore
-from sdp_control.tasks.receive_vis import receive_visibilities # type: ignore
-from sdp_control.tasks.process_vis import process_visibilities # type: ignore
+from sdp_control.models import ObservationState, Observation
+from sdp_control.tasks.receive_vis import receive_visibilities
+from sdp_control.tasks.process_vis import process_visibilities
+from sdp_control.tasks.review import ReviewDecision
 import pytest
 
 
@@ -11,6 +12,11 @@ def received_observation(tmp_path):
     # process_visibilities operates on an existing .ms, so receive it first
     obs = Observation(id="obs_test", ms_dir=str(tmp_path), state=ObservationState.RECEIVING)
     return receive_visibilities(obs)
+
+
+def test_review_processed_visibilities():
+    assert ReviewDecision.CONTINUE.value == "continue"
+    assert ReviewDecision.REPROCESS.value == "re-process"
 
 
 def test_receive_visibilities(received_observation):
