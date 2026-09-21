@@ -56,14 +56,3 @@ def review_processed_visibilities(observation: Observation) -> ReviewDecision | 
     logger.info(f"Review decision for {observation.id}: {decision}")
     return decision  # Return the decision made by the reviewer
 
-
-def remove_ms(observation: Observation) -> None:
-    """
-    Remove the Measurement Set (MS) directory for a given observation ID.
-
-    Args:
-        observation (Observation): The observation whose MS directory is to be removed.
-    """
-    ms_dir = Path(config.storage.data_dir) / f"{observation.id}_raw_{observation.datetime_stamp}.ms"
-    
-    pass

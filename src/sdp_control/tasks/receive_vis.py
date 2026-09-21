@@ -52,3 +52,35 @@ def receive_visibilities(observation: Observation) -> Observation:
         observation.update_state(ObservationState.FAILED)
 
     return observation
+
+@task(
+    name="remove_ms",
+    task_run_name="remove-ms-{observation.id}",
+    retries=3,
+    retry_delay_seconds=10,
+    log_prints=True
+)
+def remove_ms(observation: Observation) -> None:
+    """Remove the Measurement Set directory for a given observation.
+
+    Args:
+        observation (Observation): The observation whose Measurement Set directory is to be removed.
+    """
+    logger = get_run_logger()
+    ms_path_host = Path(observation.ms_dir) / f"{observation.id}_raw_{observation.datetime_stamp}.ms"
+    if ms_path_host.exists():
+        logger.info(f"Removing Measurement Set directory: {ms_path_host}")
+        remove_directory(ms_path_host)
+        logger.info(f"Successfully removed Measurement Set directory: {ms_path_host}")
+    else:
+        logger.warning(f"Measurement Set directory does not exist: {ms_path_host}")
+
+def remove_directory(path: Path) -> None:
+    """Recursively remove a directory and its contents."""
+    if path.is_dir():
+        for item in path.iterdir():
+            if item.is_dir():
+                remove_directory(item)
+            else:
+                item.unlink()
+        path.rmdir()
