@@ -14,7 +14,7 @@ from sdp_control.config import config
 
 @task(
     name="receive_visibilities",
-    task_run_name="receive-{(observation.id).replace('_', '-')}",
+    task_run_name="receive-{observation.id}",
     retries=3, 
     retry_delay_seconds=10, 
     log_prints=True

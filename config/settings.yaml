@@ -18,7 +18,7 @@ observation:
   retry_delay_seconds: 10
 
 processing:
-  max_concurrency: 2
+  max_concurrency: 5
   command_timeout_seconds: 3600
 
 containers:

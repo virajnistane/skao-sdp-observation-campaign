@@ -33,7 +33,7 @@ def _ensure_process_concurrency_limit() -> None:
 
 @task(
     name="process_visibilities",
-    task_run_name="process-{(observation.id).replace('_', '-')}",
+    task_run_name="process-{observation.id}",
     retries=3, 
     retry_delay_seconds=10, 
     log_prints=True
