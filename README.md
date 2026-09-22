@@ -8,10 +8,10 @@ The campaign runs as a single Prefect flow (`main.py`). For each observation, it
 
 1. Receives raw visibilities into a Measurement Set via a mock Docker container.
 2. Processes the Measurement Set (imaging) with a concurrency-limited Docker container.
-3. Pauses for a human reviewer to inspect a generated preview artifact and choose **Continue** or **Re-process**.
+3. Pauses for a human reviewer to inspect a generated preview artifact and choose **Continue** or **Re-process**. The resume-run prompt identifies the observation and links its preview artifact, so it's clear which observation a given prompt is for.
 4. Acts on that decision — cleaning up on **Continue**, or reprocessing and re-reviewing (up to a configured attempt cap) on **Re-process**.
 
-The loop keeps receiving new observations until the total size of stored Measurement Sets crosses a configured threshold. Each observation's post-review action runs as soon as its own decision is known, independent of other observations — an early observation's reprocess cycle doesn't stall a later observation's cleanup. Review pauses themselves are serialized flow-wide (only one reviewer prompt is ever open at a time, including reprocess-triggered re-reviews), since `pause_flow_run` pauses the whole flow run, not just the calling task.
+The loop keeps receiving new observations while the total size of stored Measurement Sets stays under a configured threshold. `resolve_review_cycle` (delete-or-reprocess) is submitted per-observation as soon as its review future exists, not batched at the end of the campaign, so `remove_ms` can free space concurrently with the receive loop still running. When the threshold is crossed, the loop doesn't stop outright — it waits and rechecks (real disk rescan each time), since the backlog is often transient and clears once in-flight reviews resolve; see `storage.count_scope` and `observation.storage_wait_indefinite` below for how long it waits and what counts toward the threshold. Each observation's post-review action runs as soon as its own decision is known, independent of other observations — an early observation's reprocess cycle doesn't stall a later observation's cleanup. Review pauses themselves are serialized flow-wide (only one reviewer prompt is ever open at a time, including reprocess-triggered re-reviews), since `pause_flow_run` pauses the whole flow run, not just the calling task.
 
 ## Pipeline flow
 
@@ -28,7 +28,7 @@ review_processed_visibilities   (pause_flow_run: reviewer picks Continue / Re-pr
         └── Re-process  → process_visibilities → review_processed_visibilities   (loops up to quality_gate.max_attempts)
 ```
 
-`resolve_review_cycle` (`src/sdp_control/tasks/review.py`) is itself a Prefect task, submitted once per observation, so each observation's outcome (delete or reprocess) is handled concurrently rather than one observation blocking the next.
+`resolve_review_cycle` (`src/sdp_control/tasks/review.py`) is itself a Prefect task, submitted once per observation inside the receive loop (not after it), so each observation's outcome (delete or reprocess) is handled concurrently rather than one observation blocking the next — and so `remove_ms` can keep freeing storage even while the receive loop itself is waiting out a `storage_full` retry.
 
 ## Requirements
 
@@ -50,7 +50,10 @@ Settings live in `config/settings.yaml`, loaded into `src/sdp_control/config.py:
 
 | Key | Purpose |
 |---|---|
-| `storage.data_dir` / `storage.storage_threshold_mb` | Where Measurement Sets land and the total size that stops the receive loop |
+| `storage.data_dir` / `storage.storage_threshold_mb` | Where Measurement Sets land and the total size that triggers the storage-wait retry |
+| `storage.count_scope` | What counts toward the threshold: `ms_only` (default, raw `.ms` dirs only) or `all` (everything under `data_dir`, including processed/preview output) |
+| `observation.storage_wait_indefinite` | When storage is full: `true` (default) polls forever until space frees; `false` gives up after `observation.retry_attempts` |
+| `observation.retry_attempts` / `observation.retry_delay_seconds` | Retry cap (when not waiting indefinitely) and poll interval (seconds) between storage rechecks |
 | `processing.max_concurrency` | Max concurrent `process_visibilities` Docker runs |
 | `quality_gate.max_attempts` | Max reprocess+review cycles per observation before giving up |
 | `containers.receive` / `containers.process` | Docker images and commands for each step |
