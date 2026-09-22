@@ -9,6 +9,8 @@ from typing import Any, cast
 
 from prefect import task, get_run_logger
 from prefect.flow_runs import pause_flow_run
+from prefect.input import RunInput
+from prefect.settings import PREFECT_UI_URL
 from prefect.client.orchestration import get_client
 from prefect.client.schemas.actions import GlobalConcurrencyLimitCreate
 from prefect.concurrency.sync import concurrency
@@ -22,6 +24,9 @@ from sdp_control.tasks.process_vis import process_visibilities
 class ReviewDecision(StrEnum):
     CONTINUE = "continue"
     REPROCESS = "re-process"
+
+class ReviewDecisionInput(RunInput):
+    decision: ReviewDecision
 
 REVIEW_PAUSE_LIMIT_NAME = "review-pause"
 
@@ -68,17 +73,26 @@ def review_processed_visibilities(observation: Observation) -> ReviewDecision | 
         raise FileNotFoundError(f"Processed data directory does not exist: {processed_data_dir}")
 
     # Create a preview artifact for the observation
-    create_preview_artifact(observation)
+    preview_artifact_id = create_preview_artifact(observation)
 
     # Pause until the reviewer chooses the next workflow action.
     # Serialized: pause_flow_run pauses the whole flow run, not just this task,
     # so only one review (original or reprocess-triggered) may be paused at a time.
+    # description identifies the observation and links its preview artifact in the resume-run modal.
+    preview_url = f"{PREFECT_UI_URL.value().rstrip('/')}/artifacts/artifact/{preview_artifact_id}"
+    review_input = ReviewDecisionInput.with_initial_data(
+        description=(
+            f"Review decision for observation **{observation.id}**\n\n"
+            f"[View preview artifact]({preview_url})"
+        )
+    )
     _ensure_review_pause_limit()
     with concurrency(REVIEW_PAUSE_LIMIT_NAME, occupy=1):
-        decision = pause_flow_run(
-            wait_for_input=ReviewDecision,
+        result = pause_flow_run(
+            wait_for_input=review_input,
             timeout=900,  # Timeout after 15 minutes
         )
+    decision = result.decision
     logger.info(f"Review decision for {observation.id}: {decision}")
     return decision  # Return the decision made by the reviewer
 

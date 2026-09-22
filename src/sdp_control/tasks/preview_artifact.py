@@ -4,6 +4,7 @@
 
 from pathlib import Path
 from typing import TypeAlias
+from uuid import UUID
 import base64
 
 from sdp_control.config import config
@@ -21,7 +22,7 @@ from prefect.artifacts import create_image_artifact, create_markdown_artifact
     retry_delay_seconds=10,
     log_prints=True
 )
-def create_preview_artifact(observation: Observation) -> None:
+def create_preview_artifact(observation: Observation) -> UUID:
 
     """Create a Prefect artifact for the preview image.
 
@@ -47,7 +48,7 @@ def create_preview_artifact(observation: Observation) -> None:
     image_b64 = base64.b64encode(preview_path.read_bytes()).decode("ascii")
     image_url = f"data:image/png;base64,{image_b64}"
 
-    create_image_artifact(
+    return create_image_artifact(
         image_url=image_url,
         key=f"preview-{observation.id.replace('_', '-')}",
         description=f"Processed visibility preview for {observation.id}",
