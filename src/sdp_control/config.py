@@ -16,15 +16,11 @@ class AppConfig:
 @dataclass
 class StorageConfig:
 	data_dir: str = "/data"
-	observations_dir: str = "/data/observations"
 	storage_threshold_mb: int = 10240
-	measurement_suffix: str = ".ms"
-
 
 @dataclass
 class ObservationConfig:
 	receive_interval_seconds: int = 60
-	max_observations: int | None = None
 	retry_attempts: int = 2
 	retry_delay_seconds: int = 10
 
@@ -99,7 +95,7 @@ def load_config(path: str | Path | None = None) -> Config:
 
 	containers = values.get("containers", {})
 	storage = values.get("storage", {})
-	for path_key in ("data_dir", "observations_dir"):
+	for path_key in ["data_dir"]:
 		path_value = storage.get(path_key)
 		if path_value and not Path(path_value).is_absolute():
 			storage[path_key] = str(ROOT_DIR / path_value)
