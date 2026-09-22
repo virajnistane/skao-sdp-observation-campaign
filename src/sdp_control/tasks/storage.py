@@ -65,6 +65,9 @@ def get_total_ms_size_mb(ms_dir: str | Path, current_total_size_mb: float) -> fl
     if current_total_size_mb is None or not isinstance(current_total_size_mb, (int, float)):
         raise ValueError("current_total_size_mb must be a valid int/float")
 
+    if config.storage.count_scope == "all":
+        return get_ms_size_mb(str(ms_dir))
+
     current_total_size_mb = np.sum([
         get_ms_size_mb(str(Path(ms_dir) / ms_dir_name))
         for ms_dir_name in os.listdir(ms_dir)

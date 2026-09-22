@@ -17,12 +17,14 @@ class AppConfig:
 class StorageConfig:
 	data_dir: str = "/data"
 	storage_threshold_mb: int = 10240
+	count_scope: str = "ms_only"
 
 @dataclass
 class ObservationConfig:
 	receive_interval_seconds: int = 60
 	retry_attempts: int = 2
 	retry_delay_seconds: int = 10
+	storage_wait_indefinite: bool = True
 
 
 @dataclass

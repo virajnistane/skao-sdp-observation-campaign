@@ -8,11 +8,13 @@ app:
 storage:
   data_dir: ./data
   storage_threshold_mb: 5120  # 5 GiB
+  count_scope: ms_only  # "ms_only" (raw .ms dirs only) or "all" (everything under data_dir)
 
 observation:
   receive_interval_seconds: 60
   retry_attempts: 2
   retry_delay_seconds: 10
+  storage_wait_indefinite: true  # poll forever when storage is full; false caps it at retry_attempts
 
 processing:
   max_concurrency: 5

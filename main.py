@@ -5,6 +5,7 @@
 
 
 import os
+import time
 import numpy as np
 from pathlib import Path
 from typing import Any, cast
@@ -43,21 +44,36 @@ def main() -> None:
     logger.info("Starting observation campaign. Will continue until storage limit is exceeded or an error occurs.")
     iter = 0
     
-    # List of tuples (PrefectFuture[Observation], PrefectFuture[ReviewDecision | None]) for review tasks
-    # This allows us to wait for all review tasks to complete at the end of the flow and handle their outcomes.
-    future_list = []
+    # Futures for resolve_review_cycle (remove_ms / reprocess), submitted per-observation
+    # inside the loop below so cleanup runs concurrently and isn't gated behind loop exit
+    # (the storage-wait retry loop can only ever free space if remove_ms keeps firing).
+    resolve_futures = []
 
     # Keep track of the prior review future to chain reviews
     # This ensures that each review starts after the previous one has completed, allowing for sequential decision-making.
     prior_review_future: PrefectFuture[ReviewDecision | None] | None = None
 
     while True:
-        # Check if the storage limit has been exceeded before starting a new observation
+        # Check if the storage limit has been exceeded before starting a new observation.
+        # Wait and retry instead of stopping outright, since review actions running
+        # concurrently free space (remove_ms) and the backlog is often transient.
         if storage_full(current_total_size_mb=ms_size_total_mb):
             logger.info(
-                f"Storage limit exceeded: {ms_size_total_mb:.2f} MB > {config.storage.storage_threshold_mb:.2f} MB"
+                f"Storage limit exceeded: {ms_size_total_mb:.2f} MB > {config.storage.storage_threshold_mb:.2f} MB. "
+                "Waiting for in-flight review actions to free space."
             )
-            break
+            attempt = 0
+            while config.observation.storage_wait_indefinite or attempt < config.observation.retry_attempts:
+                attempt += 1
+                time.sleep(config.observation.retry_delay_seconds)
+                ms_size_total_mb = get_total_ms_size_mb(config.storage.data_dir, ms_size_total_mb)
+                if not storage_full(current_total_size_mb=ms_size_total_mb):
+                    logger.info(f"Storage freed to {ms_size_total_mb:.2f} MB after {attempt} retry(ies); resuming campaign.")
+                    break
+                logger.info(f"Still over threshold ({ms_size_total_mb:.2f} MB); retry {attempt}.")
+            else:
+                logger.info(f"Storage still full after {config.observation.retry_attempts} retries; stopping campaign.")
+                break
 
         # Create an observation in the RECEIVING state
         obs = Observation(
@@ -85,8 +101,15 @@ def main() -> None:
             cast(Observation, process_future), # Type hint for the process future
             wait_for=prior_review_future, # Wait for the prior review to finish before starting this one
         )
-        future_list.append((process_future, review_future))
         prior_review_future = review_future
+
+        # Submit (not call) immediately so remove_ms/reprocess runs as soon as this
+        # observation's decision resolves, independent of the receive loop still running
+        # (including while it's waiting out a storage_full retry above).
+        submit_resolve = cast(Any, resolve_review_cycle.submit)
+        resolve_futures.append(
+            submit_resolve(cast(Observation, process_future), review_future)
+        )
 
         # Update the total size of all the Measurement Sets
         ms_size_total_mb = get_total_ms_size_mb(config.storage.data_dir, ms_size_total_mb)
@@ -94,17 +117,7 @@ def main() -> None:
 
         iter += 1
 
-    # Wait for all submitted processing tasks to finish and check their outcome
-    resolve_futures = []
-    for process_future, review_future in future_list:
-        processed_obs = process_future.result()
-        if processed_obs.state != ObservationState.AWAITING_REVIEW:
-            logger.info(f"Failed to process visibilities for observation {processed_obs.id}. Current state: {processed_obs.state.name}")
-
-        # Submit (not call) so each observation's decision is acted on as soon as
-        # it resolves, instead of blocking behind earlier observations' reprocess cycles.
-        resolve_futures.append(resolve_review_cycle.submit(processed_obs, review_future))
-
+    # Wait for all in-flight resolve_review_cycle tasks (remove_ms / reprocess) to finish.
     for f in resolve_futures:
         f.result()
 
