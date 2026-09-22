@@ -9,9 +9,9 @@ The campaign runs as a single Prefect flow (`main.py`). For each observation, it
 1. Receives raw visibilities into a Measurement Set via a mock Docker container.
 2. Processes the Measurement Set (imaging) with a concurrency-limited Docker container.
 3. Pauses for a human reviewer to inspect a generated preview artifact and choose **Continue** or **Re-process**.
-4. Acts on that decision automatically — cleaning up on **Continue**, or reprocessing and re-reviewing (up to a configured attempt cap) on **Re-process**.
+4. Acts on that decision — cleaning up on **Continue**, or reprocessing and re-reviewing (up to a configured attempt cap) on **Re-process**.
 
-The loop keeps receiving new observations until the total size of stored Measurement Sets crosses a configured threshold.
+The loop keeps receiving new observations until the total size of stored Measurement Sets crosses a configured threshold. Each observation's post-review action runs as soon as its own decision is known, independent of other observations — an early observation's reprocess cycle doesn't stall a later observation's cleanup. Review pauses themselves are serialized flow-wide (only one reviewer prompt is ever open at a time, including reprocess-triggered re-reviews), since `pause_flow_run` pauses the whole flow run, not just the calling task.
 
 ## Pipeline flow
 
@@ -23,10 +23,12 @@ process_visibilities      (capped at processing.max_concurrency)
         │
         ▼
 review_processed_visibilities   (pause_flow_run: reviewer picks Continue / Re-process)
-        │
+        │                        serialized flow-wide via the "review-pause" concurrency limit
         ├── Continue    → remove_ms            (delete the Measurement Set)
         └── Re-process  → process_visibilities → review_processed_visibilities   (loops up to quality_gate.max_attempts)
 ```
+
+`resolve_review_cycle` (`src/sdp_control/tasks/review.py`) is itself a Prefect task, submitted once per observation, so each observation's outcome (delete or reprocess) is handled concurrently rather than one observation blocking the next.
 
 ## Requirements
 
@@ -54,6 +56,8 @@ Settings live in `config/settings.yaml`, loaded into `src/sdp_control/config.py:
 | `containers.receive` / `containers.process` | Docker images and commands for each step |
 | `containers.mount_path` | Container-side mount point for the data volume |
 
+Two Prefect global concurrency limits are created automatically on first run (visible in the Prefect UI under Concurrency Limits): `process-visibilities` (limit = `processing.max_concurrency`) caps concurrent Docker processing runs, and `review-pause` (fixed at 1) serializes `pause_flow_run` calls so only one review is ever awaiting reviewer input at a time.
+
 ## Running
 
 Start the Prefect server first — check `uv run prefect config view`; if `PREFECT_API_URL` is set (the default local profile points at `http://127.0.0.1:4200/api`), `main.serve()` will try to reach that URL and fail with `httpx.ConnectError` unless a server is running there:
@@ -79,19 +83,21 @@ uv run pytest tests/unit
 
 ```
 src/sdp_control/
-  config.py            # settings.yaml loader / dataclasses
-  models.py             # Observation, ObservationState
+  config.py                     # settings.yaml loader / dataclasses
+  models.py                     # Observation, ObservationState
   tasks/
-    receive_vis.py       # receive_visibilities, remove_ms
-    process_vis.py        # process_visibilities
-    review.py              # review_processed_visibilities, resolve_review_cycle
-    preview_artifact.py     # create_preview_artifact
-    storage.py               # storage size / threshold checks
+    receive_vis.py              # receive_visibilities, remove_ms
+    process_vis.py              # process_visibilities
+    review.py                   # review_processed_visibilities, resolve_review_cycle
+    preview_artifact.py         # create_preview_artifact
+    storage.py                  # storage size / threshold checks
   utils/
-    docker_runner.py          # run_container
-    plot_preview.py            # FITS -> PNG preview rendering
+    docker_runner.py            # run_container
+    plot_preview.py             # FITS -> PNG preview rendering
 config/settings.yaml
-tests/unit/
+tests/
+  unit/
+  integration/
 ```
 
 ## See also
