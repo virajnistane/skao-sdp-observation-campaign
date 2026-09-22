@@ -9,7 +9,9 @@ from typing import Any, cast
 
 from prefect import task, get_run_logger
 from prefect.flow_runs import pause_flow_run
-from prefect.futures import PrefectFuture
+from prefect.client.orchestration import get_client
+from prefect.client.schemas.actions import GlobalConcurrencyLimitCreate
+from prefect.concurrency.sync import concurrency
 
 from sdp_control.config import config
 from sdp_control.models import Observation, ObservationState
@@ -20,6 +22,22 @@ from sdp_control.tasks.process_vis import process_visibilities
 class ReviewDecision(StrEnum):
     CONTINUE = "continue"
     REPROCESS = "re-process"
+
+REVIEW_PAUSE_LIMIT_NAME = "review-pause"
+
+
+def _ensure_review_pause_limit() -> None:
+    """Create the global concurrency limit that serializes pause_flow_run calls, if it doesn't exist yet."""
+    client = get_client(sync_client=True)
+    try:
+        client.read_global_concurrency_limit_by_name(REVIEW_PAUSE_LIMIT_NAME)
+    except Exception:
+        client.create_global_concurrency_limit(
+            GlobalConcurrencyLimitCreate(
+                name=REVIEW_PAUSE_LIMIT_NAME,
+                limit=1,
+            )
+        )
 
 @task(
     name="review_processed_visibilities",
@@ -53,26 +71,33 @@ def review_processed_visibilities(observation: Observation) -> ReviewDecision | 
     create_preview_artifact(observation)
 
     # Pause until the reviewer chooses the next workflow action.
-    decision = pause_flow_run(
-        wait_for_input=ReviewDecision,
-        timeout=900,  # Timeout after 15 minutes
-    )
+    # Serialized: pause_flow_run pauses the whole flow run, not just this task,
+    # so only one review (original or reprocess-triggered) may be paused at a time.
+    _ensure_review_pause_limit()
+    with concurrency(REVIEW_PAUSE_LIMIT_NAME, occupy=1):
+        decision = pause_flow_run(
+            wait_for_input=ReviewDecision,
+            timeout=900,  # Timeout after 15 minutes
+        )
     logger.info(f"Review decision for {observation.id}: {decision}")
     return decision  # Return the decision made by the reviewer
 
 
+@task(
+    name="resolve_review_cycle", 
+    task_run_name="resolve-review-{observation.id}",
+    retries=3,
+    retry_delay_seconds=10,
+    log_prints=True)
 def resolve_review_cycle(
-    process_future: PrefectFuture[Observation],
-    review_future: "PrefectFuture[ReviewDecision | None]",
-    logger,
+    observation: Observation,
+    decision: ReviewDecision | None,
 ) -> None:
     """Act on a review decision, resubmitting process+review on REPROCESS until resolved."""
+    logger = get_run_logger()
     max_attempts = config.quality_gate.max_attempts
     attempt = 1
     while True:
-        decision = review_future.result()
-        observation = process_future.result()
-
         if decision == ReviewDecision.CONTINUE:
             remove_ms.submit(observation)
             return
@@ -87,6 +112,8 @@ def resolve_review_cycle(
             process_future = process_visibilities.submit(observation)
             submit_review = cast(Any, review_processed_visibilities.submit)
             review_future = submit_review(cast(Observation, process_future))
+            observation = process_future.result()
+            decision = review_future.result()
             continue
 
         # decision is None (pause_flow_run timed out) or unexpected — stop, leave .ms as-is
