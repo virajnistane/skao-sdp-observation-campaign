@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # Author: Viraj Nistane
-# Description: This file contains the task to receive visibilities from the SDP pipeline
-# and store them in a specified directory.
+# Description: This file contains the data models for the SDP control system, including the Observation class and ObservationState enum.
 
 import datetime
 from dataclasses import dataclass

@@ -55,7 +55,7 @@ def process_visibilities(observation: Observation) -> Observation:
     out_dir_host.mkdir(parents=True, exist_ok=True)
     out_path_container_prefix = Path(mount_path) / f"{observation.id}_processed_{observation.datetime_stamp}" / "out"
 
-    observation.update_state(ObservationState.RECEIVING)
+    observation.update_state(ObservationState.PROCESSING)
     logger.info(f"{observation.state.name}: {observation.id} -> {ms_dir_host}")
 
     try:
