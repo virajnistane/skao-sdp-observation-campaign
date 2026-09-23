@@ -8,6 +8,7 @@ from pathlib import Path
 from prefect import task, get_run_logger
 
 from sdp_control.utils.docker_runner import run_container
+# from sdp_control.utils.k8s_runner import run_container
 from sdp_control.models import Observation, ObservationState
 from sdp_control.config import config
 
@@ -84,3 +85,13 @@ def remove_directory(path: Path) -> None:
             else:
                 item.unlink()
         path.rmdir()
+
+if __name__ == "__main__":
+    # Example usage
+    obs = Observation(
+        id="obs_test",
+        ms_dir=config.storage.data_dir,
+        state=ObservationState.RECEIVING,
+        datetime_stamp="2026-01-01T12-00-00"
+    )
+    updated_obs = receive_visibilities(obs)

@@ -111,3 +111,21 @@ The architecture follows SDP's dependency-and-resource-gating pattern closely, b
 1. it's one continuous campaign-scoped flow rather than per-observation Execution Blocks, and
 2. it doesn't model the real-time/batch PB split since this exercise has no real-time requirement.
 
+
+## Extended scope
+
+### Kubernetes runner (design artifact, not shipped)
+
+`k8s/pvc.yaml` and `src/sdp_control/utils/k8s_runner.py` are a verified-but-unwired alternative to `docker_runner`: `k8s_runner.run_container(image, command, volumes)` matches `docker_runner.run_container`'s interface exactly, so swapping the import in `receive_vis.py`/`process_vis.py` is a one-line change. Verified manually against minikube — the PVC (`ska-sdp-data`) binds, a real Job runs to completion (`kubectl get jobs -w` shows `Complete 1/1`), and the output `.ms` was confirmed present inside the PVC via a debug pod.
+
+Not the shipped path: the PVC is cluster-local storage, not the project's local `./data`, so swapping it in fully would also require moving `storage.py`'s local disk scan, preview-artifact FITS reading, and `remove_ms` to operate against the cluster-mounted volume instead of the local filesystem — out of scope here. The demo runs on `docker_runner`; `k8s_runner` stands as a proven design artifact for how the Kubernetes path would work.
+
+**Advantage of Kubernetes over Docker here, if pursued:**
+
+- **Cluster scale vs single host** — `docker_runner` shells out to the local Docker daemon; `.submit()` concurrency is capped by one machine's cores. K8s Jobs schedule across a cluster, so `processing.max_concurrency` scales with node count, not laptop CPU count — matches SDP's actual distributed-compute reality.
+- **Declarative, reproducible infra** — PVC/Job manifests are versioned YAML, not imperative subprocess calls baked into Python.
+- **Resource-aware scheduling** — k8s bin-packs Jobs onto nodes via CPU/memory/GPU requests; `docker_runner` has zero awareness of what else is running on the host.
+- **Shared, distributed storage** — the PVC abstracts away *which* node writes, so the StorageClass can back onto real distributed storage (Ceph, NFS, cloud block) instead of one host's local disk — needed once processing spans many workers.
+- **Production parity** — `pyproject.toml`'s `kubernetes` dependency and `KubernetesConfig` (namespace/pvc/image_pull_policy/active_deadline_seconds) already assume k8s is the real target; `docker_runner` is explicitly the local-dev fallback.
+
+Honest tradeoff: none of this mattered for this demo's scale (single machine, mock images, one PVC) — which is why it's documented as a proven design artifact rather than the shipped path.

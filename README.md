@@ -61,6 +61,14 @@ Settings live in `config/settings.yaml`, loaded into `src/sdp_control/config.py:
 
 Two Prefect global concurrency limits are created automatically on first run (visible in the Prefect UI under Concurrency Limits): `process-visibilities` (limit = `processing.max_concurrency`) caps concurrent Docker processing runs, and `review-pause` (fixed at 1) serializes `pause_flow_run` calls so only one review is ever awaiting reviewer input at a time.
 
+## Kubernetes (design artifact, not shipped)
+
+`k8s/pvc.yaml` and `src/sdp_control/utils/k8s_runner.py` are a verified-but-unwired alternative to `docker_runner`: `k8s_runner.run_container(image, command, volumes)` matches `docker_runner.run_container`'s interface exactly, so swapping the import in `receive_vis.py`/`process_vis.py` is a one-line change. Verified manually against minikube — the PVC (`ska-sdp-data`) binds, a real Job runs to completion (`kubectl get jobs -w` shows `Complete 1/1`), and the output `.ms` was confirmed present inside the PVC via a debug pod.
+
+It's intentionally not the shipped path. The PVC is cluster-local storage, not the project's local `./data` — so swapping it in would also require moving `storage.py`'s local disk scan, preview-artifact FITS reading, and `remove_ms` to operate against the cluster-mounted volume instead of the local filesystem, which is out of scope here. The demo runs on `docker_runner`; `k8s_runner` stands as a proven design artifact for how the Kubernetes path would work.
+
+To reproduce: `minikube start`, `kubectl apply -f k8s/pvc.yaml`, swap the import in `receive_vis.py` to `from sdp_control.utils.k8s_runner import run_container`, run it, and watch `kubectl get jobs -w`.
+
 ## Running
 
 Start the Prefect server first — check `uv run prefect config view`; if `PREFECT_API_URL` is set (the default local profile points at `http://127.0.0.1:4200/api`), `main.serve()` will try to reach that URL and fail with `httpx.ConnectError` unless a server is running there:
@@ -95,9 +103,11 @@ src/sdp_control/
     preview_artifact.py         # create_preview_artifact
     storage.py                  # storage size / threshold checks
   utils/
-    docker_runner.py            # run_container
+    docker_runner.py            # run_container (shipped)
+    k8s_runner.py                # run_container on minikube (design artifact, not wired in — see Kubernetes section)
     plot_preview.py             # FITS -> PNG preview rendering
 config/settings.yaml
+k8s/pvc.yaml                    # PVC manifest for k8s_runner
 tests/
   unit/
   integration/
