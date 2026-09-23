@@ -69,23 +69,30 @@ def main(
                 "Waiting for in-flight review actions to free space."
             )
             attempt = 0
-            while storage_wait_indefinite or attempt < config.observation.retry_attempts:
+            while attempt < config.observation.retry_attempts or (
+                storage_wait_indefinite and attempt < config.observation.storage_wait_safety_limit
+            ):
                 attempt += 1
                 time.sleep(config.observation.retry_delay_seconds)
                 ms_size_total_mb = get_total_ms_size_mb(
-                    config.storage.data_dir, 
+                    config.storage.data_dir,
                     ms_size_total_mb,
                     storage_count_scope=storage_count_scope
                 )
                 if not storage_full(
-                    current_total_size_mb=ms_size_total_mb, 
+                    current_total_size_mb=ms_size_total_mb,
                     storage_threshold_mb=storage_threshold_mb
                 ):
                     logger.info(f"Storage freed to {ms_size_total_mb:.2f} MB after {attempt} retry(ies); resuming campaign.")
                     break
                 logger.info(f"Still over threshold ({ms_size_total_mb:.2f} MB); retry {attempt}.")
             else:
-                logger.info(f"Storage still full after {config.observation.retry_attempts} retries; stopping campaign.")
+                limit_hit = (
+                    config.observation.storage_wait_safety_limit
+                    if storage_wait_indefinite
+                    else config.observation.retry_attempts
+                )
+                logger.info(f"Storage still full after {limit_hit} retries; stopping campaign.")
                 break
 
         # Create an observation in the RECEIVING state

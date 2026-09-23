@@ -3,6 +3,7 @@
 # Description: This file contains the task to receive visibilities from the SDP pipeline and store them in a specified directory.
 
 import logging
+import shutil
 from pathlib import Path
 
 from prefect import task, get_run_logger
@@ -75,6 +76,35 @@ def remove_ms(observation: Observation) -> None:
         logger.info(f"Successfully removed Measurement Set directory: {ms_path_host}")
     else:
         logger.warning(f"Measurement Set directory does not exist: {ms_path_host}")
+
+@task(
+    name="quarantine_ms",
+    task_run_name="quarantine-ms-{observation.id}",
+    retries=3,
+    retry_delay_seconds=10,
+    log_prints=True
+)
+def quarantine_ms(observation: Observation) -> None:
+    """Move a quality-gate-exhausted observation's Measurement Set out of storage.data_dir.
+
+    Unlike remove_ms, this preserves the data (moved to storage.failed_dir) for manual
+    inspection, while still excluding it from the storage_threshold_mb count, since that
+    count only ever scans storage.data_dir.
+
+    Args:
+        observation (Observation): The observation whose Measurement Set directory is to be quarantined.
+    """
+    logger = get_run_logger()
+    ms_path_host = Path(observation.ms_dir) / f"{observation.id}_raw_{observation.datetime_stamp}.ms"
+    failed_dir = Path(config.storage.failed_dir)
+    failed_dir.mkdir(parents=True, exist_ok=True)
+    if ms_path_host.exists():
+        destination = failed_dir / ms_path_host.name
+        logger.info(f"Quarantining Measurement Set directory: {ms_path_host} -> {destination}")
+        shutil.move(str(ms_path_host), str(destination))
+        logger.info(f"Successfully quarantined Measurement Set directory to: {destination}")
+    else:
+        logger.warning(f"Measurement Set directory does not exist, nothing to quarantine: {ms_path_host}")
 
 def remove_directory(path: Path) -> None:
     """Recursively remove a directory and its contents."""

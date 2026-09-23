@@ -7,6 +7,7 @@ app:
 
 storage:
   data_dir: ./data
+  failed_dir: ./data_failed  # quality-gate-exhausted .ms dirs are moved here, excluded from the storage_threshold_mb count
   storage_threshold_mb: 5120  # 5 GiB
   count_scope: ms_only  # "ms_only" (raw .ms dirs only) or "all" (everything under data_dir)
 
@@ -15,6 +16,7 @@ observation:
   retry_attempts: 20
   retry_delay_seconds: 10
   storage_wait_indefinite: true  # poll forever when storage is full; false caps it at retry_attempts
+  storage_wait_safety_limit: 1000  # hard ceiling on wait-retries even when storage_wait_indefinite is true
 
 processing:
   max_concurrency: 5

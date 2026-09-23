@@ -16,6 +16,7 @@ class AppConfig:
 @dataclass
 class StorageConfig:
 	data_dir: str = "/data"
+	failed_dir: str = "/data_failed"
 	storage_threshold_mb: int | float = 10240
 	count_scope: Literal["all", "ms_only"] = "ms_only"
 
@@ -25,6 +26,7 @@ class ObservationConfig:
 	retry_attempts: int = 2
 	retry_delay_seconds: int = 10
 	storage_wait_indefinite: bool = True
+	storage_wait_safety_limit: int = 1000
 
 
 @dataclass
@@ -97,7 +99,7 @@ def load_config(path: str | Path | None = None) -> Config:
 
 	containers = values.get("containers", {})
 	storage = values.get("storage", {})
-	for path_key in ["data_dir"]:
+	for path_key in ["data_dir", "failed_dir"]:
 		path_value = storage.get(path_key)
 		if path_value and not Path(path_value).is_absolute():
 			storage[path_key] = str(ROOT_DIR / path_value)

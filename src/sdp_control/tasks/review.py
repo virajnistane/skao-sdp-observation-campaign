@@ -18,7 +18,7 @@ from prefect.concurrency.sync import concurrency
 from sdp_control.config import config
 from sdp_control.models import Observation, ObservationState
 from sdp_control.tasks.preview_artifact import create_preview_artifact
-from sdp_control.tasks.receive_vis import receive_visibilities, remove_ms
+from sdp_control.tasks.receive_vis import receive_visibilities, remove_ms, quarantine_ms
 from sdp_control.tasks.process_vis import process_visibilities
 
 class ReviewDecision(StrEnum):
@@ -119,8 +119,11 @@ def resolve_review_cycle(
         if decision == ReviewDecision.REPROCESS:
             if attempt >= max_attempts:
                 logger.warning(
-                    f"Observation {observation.id} hit max reprocess attempts ({max_attempts}); leaving .ms in place."
+                    f"Observation {observation.id} hit max reprocess attempts ({max_attempts}); "
+                    "marking FAILED and quarantining .ms out of the storage count."
                 )
+                observation.update_state(ObservationState.FAILED)
+                quarantine_ms.submit(observation)
                 return
             attempt += 1
             process_future = process_visibilities.submit(observation)
