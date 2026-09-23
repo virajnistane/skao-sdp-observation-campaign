@@ -85,19 +85,22 @@ def remove_ms(observation: Observation) -> None:
     log_prints=True
 )
 def quarantine_ms(observation: Observation) -> None:
-    """Move a quality-gate-exhausted observation's Measurement Set out of storage.data_dir.
+    """Move a quality-gate-exhausted observation's Measurement Set and processed output out of storage.data_dir.
 
     Unlike remove_ms, this preserves the data (moved to storage.failed_dir) for manual
-    inspection, while still excluding it from the storage_threshold_mb count, since that
-    count only ever scans storage.data_dir.
+    inspection, while still excluding it from the storage_threshold_mb count — this matters
+    under count_scope: "all" too, since every attempt's processed output dir would otherwise
+    keep counting toward the threshold, not just the raw .ms.
 
     Args:
-        observation (Observation): The observation whose Measurement Set directory is to be quarantined.
+        observation (Observation): The observation whose Measurement Set and processed output are to be quarantined.
     """
     logger = get_run_logger()
-    ms_path_host = Path(observation.ms_dir) / f"{observation.id}_raw_{observation.datetime_stamp}.ms"
+    ms_dir_host = Path(observation.ms_dir)
     failed_dir = Path(config.storage.failed_dir)
     failed_dir.mkdir(parents=True, exist_ok=True)
+
+    ms_path_host = ms_dir_host / f"{observation.id}_raw_{observation.datetime_stamp}.ms"
     if ms_path_host.exists():
         destination = failed_dir / ms_path_host.name
         logger.info(f"Quarantining Measurement Set directory: {ms_path_host} -> {destination}")
@@ -105,6 +108,15 @@ def quarantine_ms(observation: Observation) -> None:
         logger.info(f"Successfully quarantined Measurement Set directory to: {destination}")
     else:
         logger.warning(f"Measurement Set directory does not exist, nothing to quarantine: {ms_path_host}")
+
+    processed_dirs = sorted(
+        ms_dir_host.glob(f"{observation.id}_processed_{observation.datetime_stamp}_attempt*")
+    )
+    for processed_dir in processed_dirs:
+        destination = failed_dir / processed_dir.name
+        logger.info(f"Quarantining processed output directory: {processed_dir} -> {destination}")
+        shutil.move(str(processed_dir), str(destination))
+        logger.info(f"Successfully quarantined processed output directory to: {destination}")
 
 def remove_directory(path: Path) -> None:
     """Recursively remove a directory and its contents."""

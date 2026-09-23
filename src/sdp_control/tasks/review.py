@@ -119,7 +119,7 @@ def resolve_review_cycle(
             if observation.processing_attempt >= max_attempts:
                 logger.warning(
                     f"Observation {observation.id} hit max reprocess attempts ({max_attempts}); "
-                    "marking FAILED and quarantining .ms out of the storage count."
+                    "marking FAILED and quarantining .ms and processed files out of the storage count."
                 )
                 observation.update_state(ObservationState.FAILED)
                 quarantine_ms.submit(observation)
