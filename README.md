@@ -124,4 +124,3 @@ tests/
 ## See also
 
 - `documentation/notes.md` has the manual mock-command walkthrough (running the receive/process Docker images by hand), the development log, and the "Extended scope" section (Kubernetes runner rationale).
-- `documentation/ai_usage.md` is the AI-assistance disclosure log, organized by theme (review UX, storage management, bug fixes, Kubernetes, testing, docs).
