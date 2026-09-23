@@ -34,7 +34,7 @@ def _ensure_process_concurrency_limit() -> None:
 
 @task(
     name="process_visibilities",
-    task_run_name="process-{observation.id}",
+    task_run_name="process-{observation.id}-attempt{observation.processing_attempt}",
     retries=3, 
     retry_delay_seconds=10, 
     log_prints=True
@@ -52,9 +52,9 @@ def process_visibilities(observation: Observation) -> Observation:
 
     ms_path_container = Path(mount_path) / f"{observation.id}_raw_{observation.datetime_stamp}.ms"
 
-    out_dir_host = ms_dir_host / f"{observation.id}_processed_{observation.datetime_stamp}"
+    out_dir_host = ms_dir_host / f"{observation.id}_processed_{observation.datetime_stamp}_attempt{observation.processing_attempt}"
     out_dir_host.mkdir(parents=True, exist_ok=True)
-    out_path_container_prefix = Path(mount_path) / f"{observation.id}_processed_{observation.datetime_stamp}" / "out"
+    out_path_container_prefix = Path(mount_path) / f"{observation.id}_processed_{observation.datetime_stamp}_attempt{observation.processing_attempt}" / "out"
 
     observation.update_state(ObservationState.PROCESSING)
     logger.info(f"{observation.state.name}: {observation.id} -> {ms_dir_host}")

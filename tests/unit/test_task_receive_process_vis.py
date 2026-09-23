@@ -38,7 +38,7 @@ def test_process_visibilities(received_observation):
     assert ms_dir_path.is_dir()
 
     # Check that the expected files are present in the processed output
-    output_dir = ms_dir_path / "obs_test_processed_2024-01-01_00-00-00"
+    output_dir = ms_dir_path / "obs_test_processed_2024-01-01_00-00-00_attempt1"
     expected = [
         "out-dirty.fits",
         "out-image.fits",

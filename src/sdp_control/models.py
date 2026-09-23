@@ -23,6 +23,7 @@ class Observation:
     state: ObservationState
     ms_dir: str
     datetime_stamp: datetime.datetime | str
+    processing_attempt: int = 1
 
     def __str__(self):
         return f"Observation(id={self.id}, state={self.state}, ms_path={self.ms_dir}, datetime_stamp={self.datetime_stamp})"

@@ -46,7 +46,7 @@ def _ensure_review_pause_limit() -> None:
 
 @task(
     name="review_processed_visibilities",
-    task_run_name="review-{observation.id}",
+    task_run_name="review-{observation.id}-attempt{observation.processing_attempt}",
     retries=3,
     retry_delay_seconds=10,
     log_prints=True
@@ -66,7 +66,7 @@ def review_processed_visibilities(observation: Observation) -> ReviewDecision | 
         return None
 
     # Construct the path to the processed data directory
-    processed_data_dir = Path(config.storage.data_dir) / f"{observation.id}_processed_{observation.datetime_stamp}"
+    processed_data_dir = Path(config.storage.data_dir) / f"{observation.id}_processed_{observation.datetime_stamp}_attempt{observation.processing_attempt}"
 
     # Check if the processed data directory exists
     if not processed_data_dir.exists():
@@ -110,14 +110,13 @@ def resolve_review_cycle(
     """Act on a review decision, resubmitting process+review on REPROCESS until resolved."""
     logger = get_run_logger()
     max_attempts = config.quality_gate.max_attempts
-    attempt = 1
     while True:
         if decision == ReviewDecision.CONTINUE:
             remove_ms.submit(observation)
             return
-
+    
         if decision == ReviewDecision.REPROCESS:
-            if attempt >= max_attempts:
+            if observation.processing_attempt >= max_attempts:
                 logger.warning(
                     f"Observation {observation.id} hit max reprocess attempts ({max_attempts}); "
                     "marking FAILED and quarantining .ms out of the storage count."
@@ -125,7 +124,7 @@ def resolve_review_cycle(
                 observation.update_state(ObservationState.FAILED)
                 quarantine_ms.submit(observation)
                 return
-            attempt += 1
+            observation.processing_attempt += 1
             process_future = process_visibilities.submit(observation)
             submit_review = cast(Any, review_processed_visibilities.submit)
             review_future = submit_review(cast(Observation, process_future))
