@@ -25,9 +25,6 @@ from sdp_control.tasks.preview_artifact import create_preview_artifact
 from sdp_control.tasks.receive_vis import receive_visibilities, remove_ms, quarantine_ms
 from sdp_control.tasks.process_vis import process_visibilities
 
-load_dotenv()  # reads .env in the current working directory into os.environ
-SlackWebhook(url=SecretStr(os.environ["PREFECT_SLACK_WEBHOOK_URL"])).save(name="sdp-review-alerts", overwrite=True)
-
 class ReviewDecision(StrEnum):
     CONTINUE = "continue"
     REPROCESS = "re-process"
@@ -51,10 +48,18 @@ def _ensure_review_pause_limit() -> None:
             )
         )
 
+def _ensure_slack_block() -> None:
+    """Best-effort: (re)register the Slack block from env if a webhook URL is configured."""
+    load_dotenv()  # reads .env in the current working directory into os.environ
+    webhook_url = os.environ.get("PREFECT_SLACK_WEBHOOK_URL")
+    if webhook_url:
+        SlackWebhook(url=SecretStr(webhook_url)).save(name="sdp-review-alerts", overwrite=True)
+
 def _notify_review_needed(observation_id: str, artifact_link: str, ui_url: str) -> None:
     """Best-effort Slack alert for a paused review; never blocks the pause itself."""
     logger = get_run_logger()
     try:
+        _ensure_slack_block()
         slack = SlackWebhook.load("sdp-review-alerts")
         slack.notify( # type: ignore
             f"Observation {observation_id} needs review: {artifact_link}\n"
