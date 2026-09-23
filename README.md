@@ -64,7 +64,7 @@ Settings live in `config/settings.yaml`, loaded into `src/sdp_control/config.py:
 
 Two Prefect global concurrency limits are created automatically on first run (visible in the Prefect UI under Concurrency Limits): `process-visibilities` (limit = `processing.max_concurrency`) caps concurrent Docker processing runs, and `review-pause` (fixed at 1) serializes `pause_flow_run` calls so only one review is ever awaiting reviewer input at a time.
 
-**Optional Slack alerts**: when a review pauses, a Slack message (with the preview artifact link and the Prefect UI URL) is sent via a `SlackWebhook` block named `review-alerts`. Create it once via the Prefect UI (Blocks → Slack Webhook) or `SlackWebhook(url="...").save("review-alerts")`. If the block doesn't exist or the webhook call fails, a warning is logged and the review pause proceeds normally regardless — Slack is a best-effort side-channel, never a blocker.
+**Optional Slack alerts**: when a review pauses, a Slack message (with the preview artifact link and the Prefect UI URL) is sent via a `SlackWebhook` block named `sdp-review-alerts`. It's registered lazily (only right before a notification is actually sent, never at import time) from `PREFECT_SLACK_WEBHOOK_URL` if that env var is set (`.env` is loaded automatically); otherwise create the block once via the Prefect UI (Blocks → Slack Webhook) or `SlackWebhook(url="...").save("sdp-review-alerts")`. If the block doesn't exist or the webhook call fails, a warning is logged and the review pause proceeds normally regardless — Slack is a best-effort side-channel, never a blocker.
 
 ## Kubernetes (design artifact, not shipped)
 
@@ -92,8 +92,11 @@ This calls `main.serve()`, registering `long_term_observation_campaign` as a ser
 ## Testing
 
 ```bash
-uv run pytest tests/unit
+uv run pytest tests/unit          # fast, hermetic — run_container is mocked, no Docker needed
+uv run pytest tests/integration   # slower — real Docker containers, real Prefect orchestration
 ```
+
+`tests/integration/test_end_to_end.py` exercises the full receive→process→resolve cycle (both `Continue` and quality-gate-exhaustion quarantine) against real containers; the human review pause itself (`pause_flow_run`) isn't automated and is tested manually via the Prefect UI.
 
 ## Project layout
 
@@ -120,4 +123,5 @@ tests/
 
 ## See also
 
-`presentation/notes.md` has the manual mock-command walkthrough (running the receive/process Docker images by hand) and the development log.
+- `documentation/notes.md` has the manual mock-command walkthrough (running the receive/process Docker images by hand), the development log, and the "Extended scope" section (Kubernetes runner rationale).
+- `documentation/ai_usage.md` is the AI-assistance disclosure log, organized by theme (review UX, storage management, bug fixes, Kubernetes, testing, docs).
