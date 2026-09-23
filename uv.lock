@@ -2984,6 +2984,7 @@ dependencies = [
     { name = "numpy" },
     { name = "prefect" },
     { name = "pytest" },
+    { name = "python-dotenv" },
     { name = "types-pyyaml" },
 ]
 
@@ -3002,6 +3003,7 @@ requires-dist = [
     { name = "numpy", specifier = ">=2.5.3" },
     { name = "prefect", specifier = ">=3.8.6" },
     { name = "pytest", specifier = ">=9.1.1" },
+    { name = "python-dotenv", specifier = ">=1.2.3" },
     { name = "types-pyyaml", specifier = ">=6.0.12.20260906" },
 ]
 

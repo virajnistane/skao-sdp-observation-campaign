@@ -3,6 +3,8 @@
 # Description: This file contains the task to review the processed visibilities 
 # and generate an interactive preview using Dash. 
 
+from dotenv import load_dotenv
+import os
 from pathlib import Path
 from enum import StrEnum
 from typing import Any, cast
@@ -14,12 +16,17 @@ from prefect.settings import PREFECT_UI_URL
 from prefect.client.orchestration import get_client
 from prefect.client.schemas.actions import GlobalConcurrencyLimitCreate
 from prefect.concurrency.sync import concurrency
+from prefect.blocks.notifications import SlackWebhook
+from pydantic import SecretStr
 
 from sdp_control.config import config
 from sdp_control.models import Observation, ObservationState
 from sdp_control.tasks.preview_artifact import create_preview_artifact
 from sdp_control.tasks.receive_vis import receive_visibilities, remove_ms, quarantine_ms
 from sdp_control.tasks.process_vis import process_visibilities
+
+load_dotenv()  # reads .env in the current working directory into os.environ
+SlackWebhook(url=SecretStr(os.environ["PREFECT_SLACK_WEBHOOK_URL"])).save(name="sdp-review-alerts", overwrite=True)
 
 class ReviewDecision(StrEnum):
     CONTINUE = "continue"
@@ -43,6 +50,19 @@ def _ensure_review_pause_limit() -> None:
                 limit=1,
             )
         )
+
+def _notify_review_needed(observation_id: str, artifact_link: str, ui_url: str) -> None:
+    """Best-effort Slack alert for a paused review; never blocks the pause itself."""
+    logger = get_run_logger()
+    try:
+        slack = SlackWebhook.load("sdp-review-alerts")
+        slack.notify( # type: ignore
+            f"Observation {observation_id} needs review: {artifact_link}\n"
+            f"Respond in Prefect UI: {ui_url}"
+        )
+    except Exception as e:
+        logger.warning(f"Failed to send Slack review notification for {observation_id}: {e}")
+
 
 @task(
     name="review_processed_visibilities",
@@ -88,6 +108,8 @@ def review_processed_visibilities(observation: Observation) -> ReviewDecision | 
     )
     _ensure_review_pause_limit()
     with concurrency(REVIEW_PAUSE_LIMIT_NAME, occupy=1):
+        logger.warning(f"⏸️  PAUSED — awaiting review for observation {observation.id}. Open {PREFECT_UI_URL.value().rstrip('/')} to respond.")
+        _notify_review_needed(observation.id, preview_url, PREFECT_UI_URL.value().rstrip('/'))
         result = pause_flow_run(
             wait_for_input=review_input,
             timeout=900,  # Timeout after 15 minutes
