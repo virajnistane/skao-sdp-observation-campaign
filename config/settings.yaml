@@ -12,7 +12,7 @@ storage:
 
 observation:
   receive_interval_seconds: 60
-  retry_attempts: 2
+  retry_attempts: 20
   retry_delay_seconds: 10
   storage_wait_indefinite: true  # poll forever when storage is full; false caps it at retry_attempts
 

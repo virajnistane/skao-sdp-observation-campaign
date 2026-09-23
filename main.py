@@ -26,7 +26,8 @@ from prefect.futures import PrefectFuture
 @flow(name="long-term-observation-campaign", log_prints=True)
 def main(
     storage_threshold_mb: int | float = config.storage.storage_threshold_mb,
-    storage_count_scope: Literal["all", "ms_only"] = config.storage.count_scope
+    storage_count_scope: Literal["all", "ms_only"] = config.storage.count_scope,
+    storage_wait_indefinite: bool = config.observation.storage_wait_indefinite
 ) -> None:
 
     logger = get_run_logger()
@@ -68,7 +69,7 @@ def main(
                 "Waiting for in-flight review actions to free space."
             )
             attempt = 0
-            while config.observation.storage_wait_indefinite or attempt < config.observation.retry_attempts:
+            while storage_wait_indefinite or attempt < config.observation.retry_attempts:
                 attempt += 1
                 time.sleep(config.observation.retry_delay_seconds)
                 ms_size_total_mb = get_total_ms_size_mb(
@@ -143,6 +144,7 @@ if __name__ == "__main__":
         tags = ["skao", "sdp", "long-term-observation-campaign"],
         parameters = {
             "storage_threshold_mb": config.storage.storage_threshold_mb,
-            "storage_count_scope": config.storage.count_scope
+            "storage_count_scope": config.storage.count_scope,
+            "storage_wait_indefinite": config.observation.storage_wait_indefinite
         },
     )
