@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 import yaml
 
 ROOT_DIR = Path(__file__).parent.parent.parent
@@ -16,8 +16,8 @@ class AppConfig:
 @dataclass
 class StorageConfig:
 	data_dir: str = "/data"
-	storage_threshold_mb: int = 10240
-	count_scope: str = "ms_only"
+	storage_threshold_mb: int | float = 10240
+	count_scope: Literal["all", "ms_only"] = "ms_only"
 
 @dataclass
 class ObservationConfig:

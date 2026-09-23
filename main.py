@@ -8,13 +8,13 @@ import os
 import time
 import numpy as np
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, cast, Literal
 from datetime import datetime
 import logging
 
 from sdp_control.config import config
 from sdp_control.tasks.storage import (
-    get_ms_size_mb, get_total_ms_size_mb, storage_full
+    get_total_ms_size_mb, storage_full
  ) 
 from sdp_control.models import Observation, ObservationState
 from sdp_control.tasks.receive_vis import receive_visibilities
@@ -23,10 +23,12 @@ from sdp_control.tasks.review import ReviewDecision, review_processed_visibiliti
 from prefect import flow, task, get_run_logger
 from prefect.futures import PrefectFuture
 
+@flow(name="long-term-observation-campaign", log_prints=True)
+def main(
+    storage_threshold_mb: int | float = config.storage.storage_threshold_mb,
+    storage_count_scope: Literal["all", "ms_only"] = config.storage.count_scope
+) -> None:
 
-
-@flow(name="long_term_observation_campaign", log_prints=True)
-def main() -> None:
     logger = get_run_logger()
     logger.info("Starting long-term observation campaign")
     
@@ -37,7 +39,7 @@ def main() -> None:
     # This is a simple example of how to use the SDP pipeline tasks
 
     # Measure size of all the Measurement Sets before processing
-    ms_size_total_mb = get_total_ms_size_mb(config.storage.data_dir, 0.0)
+    ms_size_total_mb = get_total_ms_size_mb(config.storage.data_dir, 0.0, storage_count_scope=storage_count_scope)
     logger.info(f"Total size of all Measurement Sets before starting campaign: {ms_size_total_mb:.2f} MB")
 
     # Start the observation loop
@@ -57,17 +59,27 @@ def main() -> None:
         # Check if the storage limit has been exceeded before starting a new observation.
         # Wait and retry instead of stopping outright, since review actions running
         # concurrently free space (remove_ms) and the backlog is often transient.
-        if storage_full(current_total_size_mb=ms_size_total_mb):
+        if storage_full(
+            current_total_size_mb=ms_size_total_mb, 
+            storage_threshold_mb=storage_threshold_mb
+):
             logger.info(
-                f"Storage limit exceeded: {ms_size_total_mb:.2f} MB > {config.storage.storage_threshold_mb:.2f} MB. "
+                f"Storage limit exceeded: {ms_size_total_mb:.2f} MB > {storage_threshold_mb:.2f} MB. "
                 "Waiting for in-flight review actions to free space."
             )
             attempt = 0
             while config.observation.storage_wait_indefinite or attempt < config.observation.retry_attempts:
                 attempt += 1
                 time.sleep(config.observation.retry_delay_seconds)
-                ms_size_total_mb = get_total_ms_size_mb(config.storage.data_dir, ms_size_total_mb)
-                if not storage_full(current_total_size_mb=ms_size_total_mb):
+                ms_size_total_mb = get_total_ms_size_mb(
+                    config.storage.data_dir, 
+                    ms_size_total_mb,
+                    storage_count_scope=storage_count_scope
+                )
+                if not storage_full(
+                    current_total_size_mb=ms_size_total_mb, 
+                    storage_threshold_mb=storage_threshold_mb
+                ):
                     logger.info(f"Storage freed to {ms_size_total_mb:.2f} MB after {attempt} retry(ies); resuming campaign.")
                     break
                 logger.info(f"Still over threshold ({ms_size_total_mb:.2f} MB); retry {attempt}.")
@@ -112,7 +124,11 @@ def main() -> None:
         )
 
         # Update the total size of all the Measurement Sets
-        ms_size_total_mb = get_total_ms_size_mb(config.storage.data_dir, ms_size_total_mb)
+        ms_size_total_mb = get_total_ms_size_mb(
+            config.storage.data_dir, 
+            ms_size_total_mb,
+            storage_count_scope=storage_count_scope
+        )
         logger.info(f"Total size of all Measurement Sets after processing: {ms_size_total_mb:.2f} MB")
 
         iter += 1
@@ -122,4 +138,11 @@ def main() -> None:
         f.result()
 
 if __name__ == "__main__":
-    main.serve()
+    main.serve(
+        name = "long-term-observation-campaign",
+        tags = ["skao", "sdp", "long-term-observation-campaign"],
+        parameters = {
+            "storage_threshold_mb": config.storage.storage_threshold_mb,
+            "storage_count_scope": config.storage.count_scope
+        },
+    )

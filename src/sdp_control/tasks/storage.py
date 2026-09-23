@@ -50,7 +50,11 @@ def get_ms_size_mb(ms_path: str) -> float:
     ms_size_mb = ms_size_bytes / (1024 * 1024)  # Convert bytes to megabytes
     return ms_size_mb
 
-def get_total_ms_size_mb(ms_dir: str | Path, current_total_size_mb: float) -> float:
+def get_total_ms_size_mb(
+    ms_dir: str | Path, 
+    current_total_size_mb: float, 
+    storage_count_scope: str = config.storage.count_scope
+) -> float:
     """
     Get the total size of all Measurement Set (MS) directories in a given directory in megabytes.
 
@@ -64,8 +68,12 @@ def get_total_ms_size_mb(ms_dir: str | Path, current_total_size_mb: float) -> fl
         raise ValueError("ms_dir must be a valid path")
     if current_total_size_mb is None or not isinstance(current_total_size_mb, (int, float)):
         raise ValueError("current_total_size_mb must be a valid int/float")
+    if storage_count_scope is None or not isinstance(storage_count_scope, str):
+        raise ValueError("storage_count_scope must be a valid string")
+    if storage_count_scope not in ["all", "ms_only"]:
+        raise ValueError("storage_count_scope must be either 'all' or 'ms_only'")
 
-    if config.storage.count_scope == "all":
+    if storage_count_scope == "all":
         return get_ms_size_mb(str(ms_dir))
 
     current_total_size_mb = np.sum([
@@ -78,7 +86,10 @@ def get_total_ms_size_mb(ms_dir: str | Path, current_total_size_mb: float) -> fl
     ])
     return current_total_size_mb
 
-def storage_full(current_total_size_mb: float) -> bool:
+def storage_full(
+    current_total_size_mb: float, 
+    storage_threshold_mb: int | float = config.storage.storage_threshold_mb
+) -> bool:
     """
     Check if the storage is full based on the configured threshold.
 
@@ -88,7 +99,7 @@ def storage_full(current_total_size_mb: float) -> bool:
     Returns:
         bool: True if storage is full, False otherwise.
     """
-    return current_total_size_mb > config.storage.storage_threshold_mb
+    return current_total_size_mb > storage_threshold_mb
 
 if __name__ == "__main__":
     # Example usage
