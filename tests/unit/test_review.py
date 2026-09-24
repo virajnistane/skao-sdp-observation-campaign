@@ -48,10 +48,7 @@ def test_resolve_review_cycle_reprocess_then_continue(monkeypatch):
         review_module.review_processed_visibilities, "submit", review_submit
     )
     monkeypatch.setattr(review_module.remove_ms, "submit", remove_submit)
-    # Storage isn't actually the point of this test; keep it off the real
-    # config.storage.data_dir so the new pre-reprocess recheck doesn't scan
-    # the real project disk.
-    monkeypatch.setattr(review_module, "storage_full", lambda **kwargs: False)
+    monkeypatch.setattr(review_module.Variable, "get", lambda *a, **k: "false")
 
     resolve_review_cycle(initial_obs, ReviewDecision.REPROCESS)
 
@@ -63,10 +60,9 @@ def test_resolve_review_cycle_reprocess_then_continue(monkeypatch):
     ), "the loop's incremented observation should carry through to CONTINUE"
 
 
-def test_resolve_review_cycle_reprocess_skipped_when_storage_full(monkeypatch):
+def test_resolve_review_cycle_reprocess_skipped_when_campaign_exhausted(monkeypatch):
     monkeypatch.setattr(config.quality_gate, "max_attempts", 5)  # plenty of attempts left
-    monkeypatch.setattr(review_module, "get_total_ms_size_mb", lambda *a, **k: 9999.0)
-    monkeypatch.setattr(review_module, "storage_full", lambda **kwargs: True)
+    monkeypatch.setattr(review_module.Variable, "get", lambda *a, **k: "true")
 
     process_submit = MagicMock()
     quarantine_submit = MagicMock()
@@ -81,9 +77,7 @@ def test_resolve_review_cycle_reprocess_skipped_when_storage_full(monkeypatch):
         processing_attempt=1,
     )
 
-    resolve_review_cycle(
-        obs, ReviewDecision.REPROCESS, storage_threshold_mb=100, storage_count_scope="ms_only"
-    )
+    resolve_review_cycle(obs, ReviewDecision.REPROCESS)
 
     process_submit.assert_not_called()
     quarantine_submit.assert_called_once()

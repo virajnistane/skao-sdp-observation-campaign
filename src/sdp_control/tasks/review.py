@@ -25,7 +25,8 @@ from sdp_control.tasks.preview_artifact import create_preview_artifact
 from sdp_control.tasks.process_vis import process_visibilities
 from sdp_control.tasks.receive_vis import (quarantine_ms, receive_visibilities,
                                            remove_ms)
-from sdp_control.tasks.storage import get_total_ms_size_mb, storage_full
+from prefect.runtime import flow_run
+from prefect.variables import Variable
 
 
 class ReviewDecision(StrEnum):
@@ -157,8 +158,6 @@ def review_processed_visibilities(observation: Observation) -> ReviewDecision | 
 def resolve_review_cycle(
     observation: Observation,
     decision: ReviewDecision | None,
-    storage_threshold_mb: int | float = config.storage.storage_threshold_mb,
-    storage_count_scope: str = config.storage.count_scope,
 ) -> None:
     """Act on a review decision, resubmitting process+review on REPROCESS until resolved."""
     logger = get_run_logger()
@@ -178,20 +177,18 @@ def resolve_review_cycle(
                 quarantine_ms.submit(observation)
                 return
 
-            # Check storage before reprocessing
-            current_total_mb = get_total_ms_size_mb(
-                ms_dir = config.storage.data_dir, 
-                current_total_size_mb=0.0, 
-                storage_count_scope=storage_count_scope
+            # If the campaign already gave up waiting for storage to free (main.py's retry
+            # loop hit its give-up branch), don't reprocess further regardless of the
+            # current byte count - a point-in-time threshold comparison can be masked by
+            # any unrelated quarantine elsewhere, even while the campaign has already
+            # decided it can't sustain more work.
+            campaign_exhausted = Variable.get(
+                f"campaign_{flow_run.id}_exhausted", default="false"
             )
-            if storage_full(
-                current_total_size_mb=current_total_mb, 
-                storage_threshold_mb=storage_threshold_mb
-            ):
-                # If storage is still full, mark the observation as FAILED and quarantine it instead of reprocessing.
+            if campaign_exhausted == "true":
                 logger.warning(
-                    f"Observation {observation.id}: storage still full ({current_total_mb:.2f} MB > "
-                    f"{storage_threshold_mb:.2f} MB); marking FAILED and quarantining instead of reprocessing further."
+                    f"Observation {observation.id}: campaign already gave up waiting for storage to free; "
+                    "marking FAILED and quarantining instead of reprocessing further."
                 )
                 observation.update_state(ObservationState.FAILED)
                 quarantine_ms.submit(observation)

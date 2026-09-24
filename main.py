@@ -14,6 +14,8 @@ from typing import Any, Literal, cast
 import numpy as np
 from prefect import flow, get_run_logger, task
 from prefect.futures import PrefectFuture
+from prefect.runtime import flow_run
+from prefect.variables import Variable
 
 from sdp_control.config import config
 from sdp_control.models import Observation, ObservationState
@@ -107,6 +109,11 @@ def main(
                 logger.info(
                     f"Storage still full after {limit_hit} retries; stopping campaign."
                 )
+                Variable.set(
+                    name=f"campaign_{flow_run.id}_exhausted",
+                    value="true",
+                    overwrite=True,
+                )
                 break
 
         # Create an observation in the RECEIVING state
@@ -146,12 +153,7 @@ def main(
         # (including while it's waiting out a storage_full retry above).
         submit_resolve = cast(Any, resolve_review_cycle.submit)
         resolve_futures.append(
-            submit_resolve(
-                cast(Observation, process_future),
-                review_future,
-                storage_threshold_mb=storage_threshold_mb,
-                storage_count_scope=storage_count_scope,
-            )
+            submit_resolve(cast(Observation, process_future), review_future)
         )
 
         # Update the total size of all the Measurement Sets
