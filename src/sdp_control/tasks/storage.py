@@ -67,6 +67,7 @@ def get_total_ms_size_mb(
     Args:
         ms_dir (str | Path): The path to the directory containing MS directories.
         current_total_size_mb (float): The current total size in megabytes.
+        storage_count_scope (str): Scope for counting storage. Can be "all" or "ms_only".
     Returns:
         float: The total size of all MS directories in megabytes.
     """
@@ -106,6 +107,7 @@ def storage_full(
 
     Args:
         current_total_size_mb (float): The current total size in megabytes.
+        storage_threshold_mb (int | float): The storage threshold in megabytes.
 
     Returns:
         bool: True if storage is full, False otherwise.

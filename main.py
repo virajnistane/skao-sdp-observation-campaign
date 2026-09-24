@@ -146,7 +146,12 @@ def main(
         # (including while it's waiting out a storage_full retry above).
         submit_resolve = cast(Any, resolve_review_cycle.submit)
         resolve_futures.append(
-            submit_resolve(cast(Observation, process_future), review_future)
+            submit_resolve(
+                cast(Observation, process_future),
+                review_future,
+                storage_threshold_mb=storage_threshold_mb,
+                storage_count_scope=storage_count_scope,
+            )
         )
 
         # Update the total size of all the Measurement Sets
