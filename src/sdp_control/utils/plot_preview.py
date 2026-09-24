@@ -13,6 +13,7 @@ from sdp_control.models import Observation
 
 FitsPath: TypeAlias = str | PathLike[str]
 
+
 def _astronomical_normalize(
     image: np.ndarray,
     background_sigma: float = 2.0,
@@ -47,15 +48,15 @@ def _astronomical_normalize(
     normalized = (clipped - lower) / (upper - lower)
     stretched = np.arcsinh(asinh_scale * normalized) / np.arcsinh(asinh_scale)
     stretched[~valid_mask] = 0.0
-    return np.nan_to_num(
-        stretched, nan=0.0, posinf=1.0, neginf=0.0
-    ).astype(np.float32)
+    return np.nan_to_num(stretched, nan=0.0, posinf=1.0, neginf=0.0).astype(np.float32)
+
 
 def fits2png(
-    fits_file: str | Path | list[Path] | list[str], 
-    vmin: float = 0.0, vmax: float = 1.0, 
-    observation: Observation | None = None, 
-    interactive_mode: bool = False
+    fits_file: str | Path | list[Path] | list[str],
+    vmin: float = 0.0,
+    vmax: float = 1.0,
+    observation: Observation | None = None,
+    interactive_mode: bool = False,
 ) -> None:
     """Plot a FITS image with normalization and color scaling.
 
@@ -67,6 +68,7 @@ def fits2png(
         interactive_mode (bool): Whether to display the plot interactively.
     """
     import matplotlib
+
     if not interactive_mode:
         # Force the non-interactive Agg backend before pyplot/pylab pick a GUI backend.
         # Tk/Qt/etc GUI backends only work on the main thread; this task can run on a
@@ -84,21 +86,31 @@ def fits2png(
     if isinstance(fits_file, list):
         # If a list of FITS files is provided, process each one
         file_paths: list[Path] = [Path(item) for item in fits_file]
-        fig, ax = plt.subplots(1, len(fits_file), figsize=(len(fits_file) * 8, 8), squeeze=False)
-        axes = ax[0] # Flatten the axes array for easier indexing
-        
+        fig, ax = plt.subplots(
+            1, len(fits_file), figsize=(len(fits_file) * 8, 8), squeeze=False
+        )
+        axes = ax[0]  # Flatten the axes array for easier indexing
+
         for i, file in enumerate(file_paths):
-            
+
             with fits.open(file) as hdul:
                 image_data = hdul[0].data
                 normalized_image = _astronomical_normalize(image_data)
 
-            axes[i].imshow(normalized_image[0, 0, :, :], origin="lower", cmap="gray", vmin=vmin, vmax=vmax)
+            axes[i].imshow(
+                normalized_image[0, 0, :, :],
+                origin="lower",
+                cmap="gray",
+                vmin=vmin,
+                vmax=vmax,
+            )
             axes[i].set_xlabel("X")
             axes[i].set_ylabel("Y")
             observation_id_text = f" (ID: {observation.id})" if observation else ""
             axes[i].set_title(f"{Path(file).stem}{observation_id_text}")
-        fig.savefig(fname=str(file_paths[0].parent / "previews.png"), bbox_inches="tight")
+        fig.savefig(
+            fname=str(file_paths[0].parent / "previews.png"), bbox_inches="tight"
+        )
     else:
         # If a single FITS file is provided, process it
         with fits.open(fits_file) as hdul:
@@ -106,7 +118,13 @@ def fits2png(
             normalized_image = _astronomical_normalize(image_data)
 
         fig, ax = plt.subplots(1, 1, figsize=(8, 8), squeeze=False)
-        ax[0].imshow(normalized_image[0, 0, :, :], origin="lower", cmap="gray", vmin=vmin, vmax=vmax)
+        ax[0].imshow(
+            normalized_image[0, 0, :, :],
+            origin="lower",
+            cmap="gray",
+            vmin=vmin,
+            vmax=vmax,
+        )
         ax[0].set_xlabel("X")
         ax[0].set_ylabel("Y")
         observation_id_text = f" (ID: {observation.id})" if observation else ""
@@ -116,4 +134,3 @@ def fits2png(
 
     if not interactive_mode:
         pylab.ion()  # Turn interactive mode back on
-

@@ -4,9 +4,10 @@
 
 from pathlib import Path
 
-from sdp_control.models import ObservationState, Observation
+from sdp_control.models import Observation, ObservationState
 
 ROOT_DIR = Path(__file__).parent.parent.parent
+
 
 def test_observation_state_enum():
     # Test the ObservationState enum
@@ -26,9 +27,15 @@ def test_observation_state_enum():
 
     assert len(ObservationState) == 6  # There are 6 states defined in the enum
 
+
 def test_observation_model():
     # Test the Observation model
-    obs = Observation(id="obs_test", state=ObservationState.RECEIVING, ms_dir=str(ROOT_DIR / "data"), datetime_stamp="2024-01-01_00-00-00")
+    obs = Observation(
+        id="obs_test",
+        state=ObservationState.RECEIVING,
+        ms_dir=str(ROOT_DIR / "data"),
+        datetime_stamp="2024-01-01_00-00-00",
+    )
     assert obs.id == "obs_test"
     assert obs.state == ObservationState.RECEIVING
     assert obs.ms_dir == f"{ROOT_DIR}/data"

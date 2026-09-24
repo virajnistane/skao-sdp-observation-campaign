@@ -6,20 +6,20 @@ import logging
 import shutil
 from pathlib import Path
 
-from prefect import task, get_run_logger
+from prefect import get_run_logger, task
 
-from sdp_control.utils.docker_runner import run_container
+from sdp_control.config import config
 # from sdp_control.utils.k8s_runner import run_container
 from sdp_control.models import Observation, ObservationState
-from sdp_control.config import config
+from sdp_control.utils.docker_runner import run_container
 
 
 @task(
     name="receive_visibilities",
     task_run_name="receive-{observation.id}",
-    retries=3, 
-    retry_delay_seconds=10, 
-    log_prints=True
+    retries=3,
+    retry_delay_seconds=10,
+    log_prints=True,
 )
 def receive_visibilities(observation: Observation) -> Observation:
 
@@ -31,7 +31,9 @@ def receive_visibilities(observation: Observation) -> Observation:
 
     ms_dir_host = Path(observation.ms_dir)
     ms_dir_host.mkdir(parents=True, exist_ok=True)
-    ms_path_container = Path(mount_path) / f"{observation.id}_raw_{observation.datetime_stamp}.ms"
+    ms_path_container = (
+        Path(mount_path) / f"{observation.id}_raw_{observation.datetime_stamp}.ms"
+    )
 
     observation.update_state(ObservationState.RECEIVING)
     logger.info(f"{observation.state.name}: {observation.id} -> {ms_dir_host}")
@@ -47,20 +49,25 @@ def receive_visibilities(observation: Observation) -> Observation:
 
         # Update the observation state to STORED after successful reception
         observation.update_state(ObservationState.STORED)
-        logger.info(f"Successfully received visibilities for observation {observation.id}")
+        logger.info(
+            f"Successfully received visibilities for observation {observation.id}"
+        )
 
     except Exception as e:
-        logger.error(f"Failed to receive visibilities for observation {observation.id}: {e}")
+        logger.error(
+            f"Failed to receive visibilities for observation {observation.id}: {e}"
+        )
         observation.update_state(ObservationState.FAILED)
 
     return observation
+
 
 @task(
     name="remove_ms",
     task_run_name="remove-ms-{observation.id}",
     retries=3,
     retry_delay_seconds=10,
-    log_prints=True
+    log_prints=True,
 )
 def remove_ms(observation: Observation) -> None:
     """Remove the Measurement Set directory for a given observation.
@@ -69,7 +76,10 @@ def remove_ms(observation: Observation) -> None:
         observation (Observation): The observation whose Measurement Set directory is to be removed.
     """
     logger = get_run_logger()
-    ms_path_host = Path(observation.ms_dir) / f"{observation.id}_raw_{observation.datetime_stamp}.ms"
+    ms_path_host = (
+        Path(observation.ms_dir)
+        / f"{observation.id}_raw_{observation.datetime_stamp}.ms"
+    )
     if ms_path_host.exists():
         logger.info(f"Removing Measurement Set directory: {ms_path_host}")
         remove_directory(ms_path_host)
@@ -77,12 +87,13 @@ def remove_ms(observation: Observation) -> None:
     else:
         logger.warning(f"Measurement Set directory does not exist: {ms_path_host}")
 
+
 @task(
     name="quarantine_ms",
     task_run_name="quarantine-ms-{observation.id}",
     retries=3,
     retry_delay_seconds=10,
-    log_prints=True
+    log_prints=True,
 )
 def quarantine_ms(observation: Observation) -> None:
     """Move a quality-gate-exhausted observation's Measurement Set and processed output out of storage.data_dir.
@@ -103,20 +114,33 @@ def quarantine_ms(observation: Observation) -> None:
     ms_path_host = ms_dir_host / f"{observation.id}_raw_{observation.datetime_stamp}.ms"
     if ms_path_host.exists():
         destination = failed_dir / ms_path_host.name
-        logger.info(f"Quarantining Measurement Set directory: {ms_path_host} -> {destination}")
+        logger.info(
+            f"Quarantining Measurement Set directory: {ms_path_host} -> {destination}"
+        )
         shutil.move(str(ms_path_host), str(destination))
-        logger.info(f"Successfully quarantined Measurement Set directory to: {destination}")
+        logger.info(
+            f"Successfully quarantined Measurement Set directory to: {destination}"
+        )
     else:
-        logger.warning(f"Measurement Set directory does not exist, nothing to quarantine: {ms_path_host}")
+        logger.warning(
+            f"Measurement Set directory does not exist, nothing to quarantine: {ms_path_host}"
+        )
 
     processed_dirs = sorted(
-        ms_dir_host.glob(f"{observation.id}_processed_{observation.datetime_stamp}_attempt*")
+        ms_dir_host.glob(
+            f"{observation.id}_processed_{observation.datetime_stamp}_attempt*"
+        )
     )
     for processed_dir in processed_dirs:
         destination = failed_dir / processed_dir.name
-        logger.info(f"Quarantining processed output directory: {processed_dir} -> {destination}")
+        logger.info(
+            f"Quarantining processed output directory: {processed_dir} -> {destination}"
+        )
         shutil.move(str(processed_dir), str(destination))
-        logger.info(f"Successfully quarantined processed output directory to: {destination}")
+        logger.info(
+            f"Successfully quarantined processed output directory to: {destination}"
+        )
+
 
 def remove_directory(path: Path) -> None:
     """Recursively remove a directory and its contents."""
@@ -128,12 +152,13 @@ def remove_directory(path: Path) -> None:
                 item.unlink()
         path.rmdir()
 
+
 if __name__ == "__main__":
     # Example usage
     obs = Observation(
         id="obs_test",
         ms_dir=config.storage.data_dir,
         state=ObservationState.RECEIVING,
-        datetime_stamp="2026-01-01T12-00-00"
+        datetime_stamp="2026-01-01T12-00-00",
     )
     updated_obs = receive_visibilities(obs)

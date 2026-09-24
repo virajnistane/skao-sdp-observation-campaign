@@ -1,36 +1,40 @@
 #!/usr/bin/env python3
 # Author: Viraj Nistane
-# Description: This file contains the task to review the processed visibilities 
-# and generate an interactive preview using Dash. 
+# Description: This file contains the task to review the processed visibilities
+# and generate an interactive preview using Dash.
 
-from dotenv import load_dotenv
 import os
-from pathlib import Path
 from enum import StrEnum
+from pathlib import Path
 from typing import Any, cast
 
-from prefect import task, get_run_logger
-from prefect.flow_runs import pause_flow_run
-from prefect.input import RunInput
-from prefect.settings import PREFECT_UI_URL
+from dotenv import load_dotenv
+from prefect import get_run_logger, task
+from prefect.blocks.notifications import SlackWebhook
 from prefect.client.orchestration import get_client
 from prefect.client.schemas.actions import GlobalConcurrencyLimitCreate
 from prefect.concurrency.sync import concurrency
-from prefect.blocks.notifications import SlackWebhook
+from prefect.flow_runs import pause_flow_run
+from prefect.input import RunInput
+from prefect.settings import PREFECT_UI_URL
 from pydantic import SecretStr
 
 from sdp_control.config import config
 from sdp_control.models import Observation, ObservationState
 from sdp_control.tasks.preview_artifact import create_preview_artifact
-from sdp_control.tasks.receive_vis import receive_visibilities, remove_ms, quarantine_ms
 from sdp_control.tasks.process_vis import process_visibilities
+from sdp_control.tasks.receive_vis import (quarantine_ms, receive_visibilities,
+                                           remove_ms)
+
 
 class ReviewDecision(StrEnum):
     CONTINUE = "continue"
     REPROCESS = "re-process"
 
+
 class ReviewDecisionInput(RunInput):
     decision: ReviewDecision
+
 
 REVIEW_PAUSE_LIMIT_NAME = "review-pause"
 
@@ -48,12 +52,16 @@ def _ensure_review_pause_limit() -> None:
             )
         )
 
+
 def _ensure_slack_block() -> None:
     """Best-effort: (re)register the Slack block from env if a webhook URL is configured."""
     load_dotenv()  # reads .env in the current working directory into os.environ
     webhook_url = os.environ.get("PREFECT_SLACK_WEBHOOK_URL")
     if webhook_url:
-        SlackWebhook(url=SecretStr(webhook_url)).save(name="sdp-review-alerts", overwrite=True)
+        SlackWebhook(url=SecretStr(webhook_url)).save(
+            name="sdp-review-alerts", overwrite=True
+        )
+
 
 def _notify_review_needed(observation_id: str, artifact_link: str, ui_url: str) -> None:
     """Best-effort Slack alert for a paused review; never blocks the pause itself."""
@@ -61,12 +69,14 @@ def _notify_review_needed(observation_id: str, artifact_link: str, ui_url: str) 
     try:
         _ensure_slack_block()
         slack = SlackWebhook.load("sdp-review-alerts")
-        slack.notify( # type: ignore
+        slack.notify(  # type: ignore
             f"Observation {observation_id} needs review: {artifact_link}\n"
             f"Respond in Prefect UI: {ui_url}"
         )
     except Exception as e:
-        logger.warning(f"Failed to send Slack review notification for {observation_id}: {e}")
+        logger.warning(
+            f"Failed to send Slack review notification for {observation_id}: {e}"
+        )
 
 
 @task(
@@ -74,10 +84,9 @@ def _notify_review_needed(observation_id: str, artifact_link: str, ui_url: str) 
     task_run_name="review-{observation.id}-attempt{observation.processing_attempt}",
     retries=3,
     retry_delay_seconds=10,
-    log_prints=True
+    log_prints=True,
 )
 def review_processed_visibilities(observation: Observation) -> ReviewDecision | None:
-
     """
     Review the processed visibilities for a given observation.
 
@@ -87,15 +96,22 @@ def review_processed_visibilities(observation: Observation) -> ReviewDecision | 
     logger = get_run_logger()
 
     if observation.state != ObservationState.AWAITING_REVIEW:
-        logger.info(f"Skipping review for observation {observation.id}. Current state: {observation.state.name}")
+        logger.info(
+            f"Skipping review for observation {observation.id}. Current state: {observation.state.name}"
+        )
         return None
 
     # Construct the path to the processed data directory
-    processed_data_dir = Path(config.storage.data_dir) / f"{observation.id}_processed_{observation.datetime_stamp}_attempt{observation.processing_attempt}"
+    processed_data_dir = (
+        Path(config.storage.data_dir)
+        / f"{observation.id}_processed_{observation.datetime_stamp}_attempt{observation.processing_attempt}"
+    )
 
     # Check if the processed data directory exists
     if not processed_data_dir.exists():
-        raise FileNotFoundError(f"Processed data directory does not exist: {processed_data_dir}")
+        raise FileNotFoundError(
+            f"Processed data directory does not exist: {processed_data_dir}"
+        )
 
     # Create a preview artifact for the observation
     preview_artifact_id = create_preview_artifact(observation)
@@ -104,7 +120,9 @@ def review_processed_visibilities(observation: Observation) -> ReviewDecision | 
     # Serialized: pause_flow_run pauses the whole flow run, not just this task,
     # so only one review (original or reprocess-triggered) may be paused at a time.
     # description identifies the observation and links its preview artifact in the resume-run modal.
-    preview_url = f"{PREFECT_UI_URL.value().rstrip('/')}/artifacts/artifact/{preview_artifact_id}"
+    preview_url = (
+        f"{PREFECT_UI_URL.value().rstrip('/')}/artifacts/artifact/{preview_artifact_id}"
+    )
     review_input = ReviewDecisionInput.with_initial_data(
         description=(
             f"Review decision for observation **{observation.id}**\n\n"
@@ -113,8 +131,12 @@ def review_processed_visibilities(observation: Observation) -> ReviewDecision | 
     )
     _ensure_review_pause_limit()
     with concurrency(REVIEW_PAUSE_LIMIT_NAME, occupy=1):
-        logger.warning(f"⏸️  PAUSED — awaiting review for observation {observation.id}. Open {PREFECT_UI_URL.value().rstrip('/')} to respond.")
-        _notify_review_needed(observation.id, preview_url, PREFECT_UI_URL.value().rstrip('/'))
+        logger.warning(
+            f"⏸️  PAUSED — awaiting review for observation {observation.id}. Open {PREFECT_UI_URL.value().rstrip('/')} to respond."
+        )
+        _notify_review_needed(
+            observation.id, preview_url, PREFECT_UI_URL.value().rstrip("/")
+        )
         result = pause_flow_run(
             wait_for_input=review_input,
             timeout=900,  # Timeout after 15 minutes
@@ -125,11 +147,12 @@ def review_processed_visibilities(observation: Observation) -> ReviewDecision | 
 
 
 @task(
-    name="resolve_review_cycle", 
+    name="resolve_review_cycle",
     task_run_name="resolve-review-{observation.id}",
     retries=3,
     retry_delay_seconds=10,
-    log_prints=True)
+    log_prints=True,
+)
 def resolve_review_cycle(
     observation: Observation,
     decision: ReviewDecision | None,
@@ -141,7 +164,7 @@ def resolve_review_cycle(
         if decision == ReviewDecision.CONTINUE:
             remove_ms.submit(observation)
             return
-    
+
         if decision == ReviewDecision.REPROCESS:
             if observation.processing_attempt >= max_attempts:
                 logger.warning(
@@ -164,4 +187,3 @@ def resolve_review_cycle(
             f"No actionable review decision for {observation.id} (got {decision!r}); leaving .ms in place."
         )
         return
-

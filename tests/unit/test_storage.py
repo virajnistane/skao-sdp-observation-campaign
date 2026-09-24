@@ -39,4 +39,6 @@ def test_get_total_ms_size_mb_invalid_scope(tmp_path):
 def test_storage_full():
     assert storage_full(current_total_size_mb=100, storage_threshold_mb=50) is True
     assert storage_full(current_total_size_mb=10, storage_threshold_mb=50) is False
-    assert storage_full(current_total_size_mb=50, storage_threshold_mb=50) is False  # boundary: strictly greater-than
+    assert (
+        storage_full(current_total_size_mb=50, storage_threshold_mb=50) is False
+    )  # boundary: strictly greater-than

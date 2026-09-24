@@ -1,4 +1,3 @@
-
 import pytest
 
 from sdp_control.utils.docker_runner import run_container

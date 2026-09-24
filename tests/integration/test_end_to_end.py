@@ -10,10 +10,10 @@ from prefect import flow
 
 from sdp_control.config import config
 from sdp_control.models import Observation, ObservationState
-from sdp_control.tasks.receive_vis import receive_visibilities
 from sdp_control.tasks.process_vis import process_visibilities
-from sdp_control.tasks.storage import get_total_ms_size_mb
+from sdp_control.tasks.receive_vis import receive_visibilities
 from sdp_control.tasks.review import ReviewDecision, resolve_review_cycle
+from sdp_control.tasks.storage import get_total_ms_size_mb
 
 
 def _receive_and_process(tmp_path):
@@ -50,7 +50,9 @@ def test_receive_and_process_real_docker(tmp_path):
     ms_only_mb = get_total_ms_size_mb(str(tmp_path), 0.0, storage_count_scope="ms_only")
     all_mb = get_total_ms_size_mb(str(tmp_path), 0.0, storage_count_scope="all")
     assert ms_only_mb > 0
-    assert all_mb > ms_only_mb, "count_scope='all' should count processed output too, not just the raw .ms"
+    assert (
+        all_mb > ms_only_mb
+    ), "count_scope='all' should count processed output too, not just the raw .ms"
 
     del processed  # only used to assert intermediate state above
 
@@ -88,6 +90,12 @@ def test_reprocess_exhaustion_quarantines(tmp_path, monkeypatch):
 
     assert processed.state == ObservationState.FAILED
     assert not ms_path.exists(), "raw .ms should have been moved out, not left in place"
-    assert not processed_dir.exists(), "processed output should have been moved out, not left in place"
-    assert (failed_dir / ms_path.name).exists(), "raw .ms should be quarantined into failed_dir"
-    assert (failed_dir / processed_dir.name).exists(), "processed output should be quarantined into failed_dir"
+    assert (
+        not processed_dir.exists()
+    ), "processed output should have been moved out, not left in place"
+    assert (
+        failed_dir / ms_path.name
+    ).exists(), "raw .ms should be quarantined into failed_dir"
+    assert (
+        failed_dir / processed_dir.name
+    ).exists(), "processed output should be quarantined into failed_dir"

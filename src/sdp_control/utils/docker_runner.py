@@ -37,7 +37,13 @@ def run_container(image: str, command: str, volumes: dict) -> None:
         user_args = ["-u", f"{os.getuid()}:{os.getgid()}"]
 
     # Construct the full Docker command
-    docker_command = ["docker", "run", "--rm"] + user_args + volume_args + [image] + shlex.split(command)
+    docker_command = (
+        ["docker", "run", "--rm"]
+        + user_args
+        + volume_args
+        + [image]
+        + shlex.split(command)
+    )
 
     logger.info(f"Running Docker container: {' '.join(docker_command)}")
 

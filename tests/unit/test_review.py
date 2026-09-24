@@ -44,7 +44,9 @@ def test_resolve_review_cycle_reprocess_then_continue(monkeypatch):
     remove_submit = MagicMock()
 
     monkeypatch.setattr(review_module.process_visibilities, "submit", process_submit)
-    monkeypatch.setattr(review_module.review_processed_visibilities, "submit", review_submit)
+    monkeypatch.setattr(
+        review_module.review_processed_visibilities, "submit", review_submit
+    )
     monkeypatch.setattr(review_module.remove_ms, "submit", remove_submit)
 
     resolve_review_cycle(initial_obs, ReviewDecision.REPROCESS)
@@ -52,18 +54,26 @@ def test_resolve_review_cycle_reprocess_then_continue(monkeypatch):
     process_submit.assert_called_once()
     remove_submit.assert_called_once()
     resolved_obs = remove_submit.call_args.args[0]
-    assert resolved_obs.processing_attempt == 2, "the loop's incremented observation should carry through to CONTINUE"
+    assert (
+        resolved_obs.processing_attempt == 2
+    ), "the loop's incremented observation should carry through to CONTINUE"
 
 
 def test_notify_review_needed_fails_open(monkeypatch, caplog):
     # _notify_review_needed is a plain helper, not a @task, so it has no Prefect
     # run context of its own when called directly - get_run_logger() would raise
     # MissingContextError without this patch.
-    monkeypatch.setattr(review_module, "get_run_logger", lambda: logging.getLogger("test_review"))
+    monkeypatch.setattr(
+        review_module, "get_run_logger", lambda: logging.getLogger("test_review")
+    )
     monkeypatch.setattr(review_module, "_ensure_slack_block", lambda: None)
-    monkeypatch.setattr(review_module.SlackWebhook, "load", MagicMock(side_effect=RuntimeError("boom")))
+    monkeypatch.setattr(
+        review_module.SlackWebhook, "load", MagicMock(side_effect=RuntimeError("boom"))
+    )
 
     with caplog.at_level(logging.WARNING, logger="test_review"):
-        review_module._notify_review_needed("obs_x", "http://artifact", "http://ui")  # must not raise
+        review_module._notify_review_needed(
+            "obs_x", "http://artifact", "http://ui"
+        )  # must not raise
 
     assert "Failed to send Slack review notification" in caplog.text

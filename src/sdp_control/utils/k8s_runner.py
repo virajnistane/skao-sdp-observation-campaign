@@ -4,11 +4,12 @@
 
 import logging
 import shlex
-import uuid
 import time
+import uuid
 
-from kubernetes import client, config as k8s_config  # type: ignore[import]
-from kubernetes.client.rest import ApiException # type: ignore[import]
+from kubernetes import client
+from kubernetes import config as k8s_config  # type: ignore[import]
+from kubernetes.client.rest import ApiException  # type: ignore[import]
 
 from sdp_control.config import config
 
@@ -20,8 +21,11 @@ k8s_config.load_kube_config()
 
 def _job_name(image: str) -> str:
     """Generate a unique job name for the Kubernetes job."""
-    slug = image.split("/")[-1].split(":")[0].lower()  # Get the last part of the image name and remove the tag
+    slug = (
+        image.split("/")[-1].split(":")[0].lower()
+    )  # Get the last part of the image name and remove the tag
     return f"{slug}-{uuid.uuid4().hex[:8]}"  # Append a short UUID for uniqueness
+
 
 def run_container(image: str, command: str, volumes: dict) -> None:
     """
@@ -39,7 +43,9 @@ def run_container(image: str, command: str, volumes: dict) -> None:
         RuntimeError: If the Kubernetes job fails.
     """
     job_name = _job_name(image)
-    logger.info(f"Running Kubernetes job: {job_name} with image: {image} and command: {command}")
+    logger.info(
+        f"Running Kubernetes job: {job_name} with image: {image} and command: {command}"
+    )
 
     # Define the container
     container = client.V1Container(
@@ -47,11 +53,9 @@ def run_container(image: str, command: str, volumes: dict) -> None:
         image=image,
         command=shlex.split(command),
         volume_mounts=[
-            client.V1VolumeMount(
-                name="data-volume",
-                mount_path=container_path
-            ) for host_path, container_path in volumes.items()
-        ]
+            client.V1VolumeMount(name="data-volume", mount_path=container_path)
+            for host_path, container_path in volumes.items()
+        ],
     )
 
     # Define the volume
@@ -60,21 +64,23 @@ def run_container(image: str, command: str, volumes: dict) -> None:
             name="data-volume",
             persistent_volume_claim=client.V1PersistentVolumeClaimVolumeSource(
                 claim_name=config.kubernetes.pvc_name  # Assuming you have a PVC defined in your Kubernetes cluster
-            )
+            ),
         )
     ]
 
     # Define the pod template
     template = client.V1PodTemplateSpec(
         metadata=client.V1ObjectMeta(labels={"job-name": job_name}),
-        spec=client.V1PodSpec(restart_policy="Never", containers=[container], volumes=volumes_2)
+        spec=client.V1PodSpec(
+            restart_policy="Never", containers=[container], volumes=volumes_2
+        ),
     )
 
     # Define the job spec
     job_spec = client.V1JobSpec(
-        template=template, 
-        backoff_limit=0, 
-        active_deadline_seconds=config.kubernetes.active_deadline_seconds
+        template=template,
+        backoff_limit=0,
+        active_deadline_seconds=config.kubernetes.active_deadline_seconds,
     )
 
     # Define the job
@@ -82,7 +88,7 @@ def run_container(image: str, command: str, volumes: dict) -> None:
         api_version="batch/v1",
         kind="Job",
         metadata=client.V1ObjectMeta(name=job_name),
-        spec=job_spec
+        spec=job_spec,
     )
 
     # Create the job
@@ -110,7 +116,7 @@ def run_container(image: str, command: str, volumes: dict) -> None:
             batch_v1.delete_namespaced_job(
                 name=job_name,
                 namespace=config.kubernetes.namespace,
-                propagation_policy='Background'  # Ensure the job and its pods are deleted
+                propagation_policy="Background",  # Ensure the job and its pods are deleted
             )
             logger.info(f"Kubernetes job {job_name} deleted.")
         except ApiException as e:
