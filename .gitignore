@@ -22,7 +22,6 @@ tests/data/*
 notebooks/*.ipynb
 
 # Notes
-documentation/ai_usage.md
 
 # AI artifacts
 graphify-out/
