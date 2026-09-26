@@ -129,10 +129,12 @@ def main(
 
         # Check that the state has been updated to STORED
         if updated_obs.state != ObservationState.STORED:
-            logger.info(
-                f"Failed to receive visibilities for observation {updated_obs.id}. Current state: {updated_obs.state.name}"
+            logger.warning(
+                f"Failed to receive visibilities for observation {updated_obs.id} (state: {updated_obs.state.name}); "
+                "skipping to the next observation."
             )
-            break
+            iter += 1
+            continue
 
         # Submit process_visibilities to run concurrently; the loop doesn't wait on it
         process_future = process_visibilities.submit(updated_obs)
